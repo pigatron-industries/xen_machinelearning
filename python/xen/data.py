@@ -38,63 +38,50 @@ class SongData:
                 return False
         return True
 
-    # def makeSequences(self, ticksPerQuarter=4, measuresPerSequence=4, timesig=(4,4)):
-    #     """ 
-    #     Create training sequences from consecutive measures in parts of the song.
-    #     Arguments:
-    #         ticksPerQuarter: number of sequences steps (ticks) per quarter note
-    #         measuresPerSequence: number of measures to create each sequence from
-    #         timesig: only use mesaures with given time signature
-    #     """
-    #     sequences = []
-    #     numNotes = 128
-    #     minPitch = 127
-    #     maxPitch = 0
-    #     for part in self.score.getElementsByClass(stream.Part):
-    #         for measure in part.getElementsByClass(stream.Measure):
-    #             measureSeq, minMeasurePitch, maxMeasurePitch = self.__makeSequenceFromMeasure(measure, ticksPerQuarter)
-    #             # print(measureSeq.shape)
-    #             minPitch = min(minPitch, minMeasurePitch)
-    #             maxPitch = max(maxPitch, maxMeasurePitch)
-    #             sequences.append(measureSeq)
-    #         sequences = np.array(sequences)
-
-    #     # groups measures into phrases of length measuresPerSequence
-    #     phraseSequences = np.empty((0, sequences.shape[1]*measuresPerSequence, numNotes))
-    #     phraseSequence = np.empty((0, numNotes))
-    #     measureCount = 0
-    #     for sequence in sequences:
-    #         if (measureCount < measuresPerSequence):
-    #             phraseSequence = np.append(phraseSequence, sequence, 0)
-    #             measureCount += 1 
-    #         else:
-    #             phraseSequences = np.append(phraseSequences, [phraseSequence], 0)
-    #             phraseSequence = np.empty((0, numNotes))
-    #             measureCount = 0
-
-    #     return phraseSequences, minPitch, maxPitch
+    def makeSequences(self, ticksPerQuarter=4, measuresPerSequence=4, match_timesig='4/4'):
+        """ 
+        Create training sequences from consecutive measures in parts of the song.
+        Arguments:
+            ticksPerQuarter: number of sequences steps (ticks) per quarter note
+            measuresPerSequence: number of measures to create each sequence from
+            timesig: only use mesaures with given time signature
+        """
+        sequences = np.empty((0, ticksPerQuarter*measuresPerSequence*4, NUM_NOTES))
+        minPitch = 127
+        maxPitch = 0
+        for part in self.getParts():
+            measuresList = self.getConsecutiveMeasures(part, measuresPerSequence, match_timesig)
+            for measures in measuresList:
+                sequence = np.empty((0, NUM_NOTES))
+                for measure in measures:
+                    measureSeq, minMeasurePitch, maxMeasurePitch = self.makeSequenceFromMeasure(measure, ticksPerQuarter)
+                    minPitch = min(minPitch, minMeasurePitch)
+                    maxPitch = max(maxPitch, maxMeasurePitch)
+                    sequence = np.append(sequence, measureSeq, 0)
+                    print(sequence.shape)
+                sequences += sequence
+        return sequences, minPitch, maxPitch
         
-    # def __makeSequenceFromMeasure(self, measure, ticksPerQuarter):
-    #     sequence = np.zeros((int(measure.duration.quarterLength * ticksPerQuarter), NUM_NOTES))        
-    #     minPitch = 127
-    #     maxPitch = 0
-    #     for element in measure.recurse().notes:
-    #         offset = element.offset * ticksPerQuarter
-    #         if element.isNote:
-    #             if(not offset.is_integer()):
-    #                 raise ValueError(f'ERROR: note offset is not an integer: {offset}')
-    #             sequence[int(offset)][element.pitch.midi] = 1
-    #             minPitch = min(minPitch, element.pitch.midi)
-    #             maxPitch = max(maxPitch, element.pitch.midi)
-    #         if element.isChord:
-    #             for note in element.notes:
-    #                 if(not offset.is_integer()):
-    #                     raise ValueError(f'ERROR: note offset is not an integer: {offset}')
-    #                 sequence[int(offset)][note.pitch.midi] = 1
-    #                 minPitch = min(minPitch, note.pitch.midi)
-    #                 maxPitch = max(maxPitch, note.pitch.midi)
-
-    #     return sequence, minPitch, maxPitch
+    def makeSequenceFromMeasure(self, measure, ticksPerQuarter):
+        sequence = np.zeros((int(measure.duration.quarterLength * ticksPerQuarter), NUM_NOTES))        
+        minPitch = 127
+        maxPitch = 0
+        for element in measure.recurse().notes:
+            offset = element.offset * ticksPerQuarter
+            if element.isNote:
+                if(not offset.is_integer()):
+                    raise ValueError(f'ERROR: note offset is not an integer: {offset}')
+                sequence[int(offset)][element.pitch.midi] = 1
+                minPitch = min(minPitch, element.pitch.midi)
+                maxPitch = max(maxPitch, element.pitch.midi)
+            if element.isChord:
+                for note in element.notes:
+                    if(not offset.is_integer()):
+                        raise ValueError(f'ERROR: note offset is not an integer: {offset}')
+                    sequence[int(offset)][note.pitch.midi] = 1
+                    minPitch = min(minPitch, note.pitch.midi)
+                    maxPitch = max(maxPitch, note.pitch.midi)
+        return sequence, minPitch, maxPitch
 
     def getConsecutiveMeasures(self, part, measuresPerSequence, match_timesig):
         consecutiveMeasuresList = []
@@ -117,6 +104,8 @@ class SongData:
             i += 1
         return consecutiveMeasuresList
 
+    def getOverlappingMeasures(self, part, measuresPerSequence, match_timesig):
+        pass 
 
     
 class SequenceDataSet:

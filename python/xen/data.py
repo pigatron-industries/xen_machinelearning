@@ -1,6 +1,6 @@
 from music21 import converter, pitch, interval, instrument, note, stream, meter
 from enum import Enum
-from fractions import Fraction 
+from xen.utils import isInteger
 import glob
 import numpy as np
 import fractions
@@ -127,6 +127,8 @@ class SequenceDataSet:
         self.songs = []
         self.sequences = None
         self.ticksPerQuarter = ticksPerQuarter
+        self.compressedSequences = None
+        self.sequenceCompressor = None
 
     def loadMidiDir(self, path):
         files = glob.glob(path + "/*.mid")
@@ -176,11 +178,49 @@ class SequenceDataSet:
         self.maxPitch = maxPitch
         return self.sequences, self.minPitch, self.maxPitch
 
+    def makeCompressor(self):
+        tickSet = {}
+        pitchSet = {}
+        for sequence in self.sequences:
+            for i, tick in enumerate(sequence):
+                for j, note in enumerate(tick):
+                    if(note > 0.5):
+                        tickSet[i] = 1
+                        pitchSet[j] = 1
+        self.sequenceCompressor = SequenceCompressor(tickSet, pitchSet)
+        return self.sequenceCompressor
 
-def isInteger(num):
-    if isinstance(num, int):
-        return True
-    if isinstance(num, float):
-        return num.is_integer()
-    if isinstance(num, Fraction):
-        return num.denominator == 1
+    def compressSequences(self):
+        # TODO remove all unused pitch classes and create a dictionary translation
+        # TODO remove all unused time points and create a dictionary translation
+        self.compressedSequences = self.sequences[0:, 0:, self.minPitch:self.maxPitch+1]
+
+ 
+
+class SequenceCompressor:
+    """
+    Compress and flatten 2 dimensional sequence arrays by removing rows and columns that never contain any data
+    """
+    def __init__(self, tickSet, pitchSet):
+        self.tickSet = tickSet
+        self.pitchSet = pitchSet
+
+    def compress(self, sequence):
+        removePitches = []
+        for pitch in range(sequence.shape[1]):
+            if pitch not in self.pitchSet:
+                removePitches.append(pitch)
+        sequence = np.delete(sequence, removePitches, axis=1)
+
+        removeTicks = []
+        for tick in range(sequence.shape[0]):
+            if tick not in self.tickSet:
+                removeTicks.append(tick)
+        sequence = np.delete(sequence, removeTicks, axis=0)
+
+        return sequence
+
+    def decompress(self, sequence):
+        # TODO
+        return sequence
+        

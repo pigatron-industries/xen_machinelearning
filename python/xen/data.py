@@ -1,5 +1,6 @@
 from music21 import converter, pitch, interval, instrument, note, stream, meter
-from enum import Enum 
+from enum import Enum
+from fractions import Fraction 
 import glob
 import numpy as np
 import fractions
@@ -39,6 +40,13 @@ class SongData:
                 return False
         return True
 
+    def hasFractionalOffsets(self, ticksPerQuarter):
+        for note in self.score.recurse().notes:
+            offset = note.offset * ticksPerQuarter
+            if(not isInteger(offset)):
+                return True
+        return False
+
     def makeSequences(self, ticksPerQuarter=4, measuresPerSequence=4, match_timesig='4/4'):
         """ 
         Create training sequences from consecutive measures in parts of the song.
@@ -50,16 +58,22 @@ class SongData:
         self.sequences = np.empty((0, ticksPerQuarter*measuresPerSequence*4, NUM_NOTES))
         minPitch = 127
         maxPitch = 0
+        ignoredSequences = 0
         for part in self.getParts():
             measuresList = self.getConsecutiveMeasures(part, measuresPerSequence, match_timesig)
             for measures in measuresList:
-                sequence = np.empty((0, NUM_NOTES))
-                for measure in measures:
-                    measureSeq, minMeasurePitch, maxMeasurePitch = self.makeSequenceFromMeasure(measure, ticksPerQuarter)
-                    minPitch = min(minPitch, minMeasurePitch)
-                    maxPitch = max(maxPitch, maxMeasurePitch)
-                    sequence = np.append(sequence, measureSeq, 0)
-                self.sequences = np.append(self.sequences, [sequence], 0)
+                try:
+                    sequence = np.empty((0, NUM_NOTES))
+                    for measure in measures:
+                        measureSeq, minMeasurePitch, maxMeasurePitch = self.makeSequenceFromMeasure(measure, ticksPerQuarter)
+                        minPitch = min(minPitch, minMeasurePitch)
+                        maxPitch = max(maxPitch, maxMeasurePitch)
+                        sequence = np.append(sequence, measureSeq, 0)
+                    self.sequences = np.append(self.sequences, [sequence], 0)
+                except ValueError as e:
+                    ignoredSequences += 1
+        if(ignoredSequences > 0):
+            print(f'Ignored {ignoredSequences} sequences from {self.filePath}')
         self.minPitch = minPitch
         self.maxPitch = maxPitch
         return self.sequences, self.minPitch, self.maxPitch
@@ -70,16 +84,14 @@ class SongData:
         maxPitch = 0
         for element in measure.recurse().notes:
             offset = element.offset * ticksPerQuarter
+            if(not isInteger(offset)):
+                raise ValueError(f'ERROR: note offset is not an integer: {offset}')
             if element.isNote:
-                if(not offset.is_integer()):
-                    raise ValueError(f'ERROR: note offset is not an integer: {offset}')
                 sequence[int(offset)][element.pitch.midi] = 1
                 minPitch = min(minPitch, element.pitch.midi)
                 maxPitch = max(maxPitch, element.pitch.midi)
             if element.isChord:
                 for note in element.notes:
-                    if(not offset.is_integer()):
-                        raise ValueError(f'ERROR: note offset is not an integer: {offset}')
                     sequence[int(offset)][note.pitch.midi] = 1
                     minPitch = min(minPitch, note.pitch.midi)
                     maxPitch = max(maxPitch, note.pitch.midi)
@@ -140,6 +152,13 @@ class SequenceDataSet:
                 filtered.append(songdata)
         self.songs = filtered
 
+    def filterFractionalOffsets(self, ticksPerQuarter=4):
+        filtered = []
+        for songdata in self.songs:
+            if (not songdata.hasFractionalOffsets(ticksPerQuarter)):
+                filtered.append(songdata)
+        self.songs = filtered
+
     def makeSequences(self, ticksPerQuarter=4, measuresPerSequence=4, match_timesig='4/4'):
         self.sequences = np.empty((0, ticksPerQuarter*measuresPerSequence*4, NUM_NOTES))
         minPitch = 127
@@ -158,14 +177,10 @@ class SequenceDataSet:
         return self.sequences, self.minPitch, self.maxPitch
 
 
-# def filterFractionalOffsets(scores):
-#     filtered = []
-#     for score in scores:
-#         include = True
-#         notes = score.recurse().notes
-#         for note in notes:
-#             if (isinstance(note.offset, fractions.Fraction)):
-#                 include = False
-#         if (include):
-#             filtered.append(score)
-#     return filtered
+def isInteger(num):
+    if isinstance(num, int):
+        return True
+    if isinstance(num, float):
+        return num.is_integer()
+    if isinstance(num, Fraction):
+        return num.denominator == 1

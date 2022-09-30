@@ -1,0 +1,5 @@
+#!/bin/sh
+# copy this file to .git/hooks
+# clear notebook output before committing 
+jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace python/*.ipynb
+git add .

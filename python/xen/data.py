@@ -187,7 +187,7 @@ class SequenceDataSet:
                     if(note > 0.5):
                         tickSet[i] = 1
                         pitchSet[j] = 1
-        self.sequenceCompressor = SequenceCompressor(tickSet, pitchSet)
+        self.sequenceCompressor = SequenceCompressor((self.sequences.shape[1], self.sequences.shape[2]), [tickSet, pitchSet])
         return self.sequenceCompressor
 
     def compressSequences(self):
@@ -201,26 +201,32 @@ class SequenceCompressor:
     """
     Compress and flatten 2 dimensional sequence arrays by removing rows and columns that never contain any data
     """
-    def __init__(self, tickSet, pitchSet):
-        self.tickSet = tickSet
-        self.pitchSet = pitchSet
+    def __init__(self, shape, axisSets):
+        self.shape = shape
+        self.axisSets = axisSets
 
     def compress(self, sequence):
-        removePitches = []
-        for pitch in range(sequence.shape[1]):
-            if pitch not in self.pitchSet:
-                removePitches.append(pitch)
-        sequence = np.delete(sequence, removePitches, axis=1)
-
-        removeTicks = []
-        for tick in range(sequence.shape[0]):
-            if tick not in self.tickSet:
-                removeTicks.append(tick)
-        sequence = np.delete(sequence, removeTicks, axis=0)
-
+        sequence = self.compressAxis(sequence, 0)
+        sequence = self.compressAxis(sequence, 1)
         return sequence
+
+    def compressAxis(self, sequence, axis):
+        removeSet = []
+        for i in range(self.shape[axis]):
+            if i not in self.axisSets[axis]:
+                removeSet.append(i)
+        return np.delete(sequence, removeSet, axis=axis)
 
     def decompress(self, sequence):
-        # TODO
+        sequence = self.decompressAxis(sequence, 0)
+        sequence = self.decompressAxis(sequence, 1)
         return sequence
         
+    def decompressAxis(self, sequence, axis):
+        removeSet = []
+        for i in range(self.shape[axis]):
+            if i not in self.axisSets[axis]:
+                removeSet.append(i)
+        for removed in removeSet:
+            sequence = np.insert(sequence, removed, 0, axis=axis)
+        return sequence

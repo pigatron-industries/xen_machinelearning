@@ -9,6 +9,13 @@ def plotPart(part):
 
 
 def plotMeasures(measures):
+    hasnotes = False
+    for measure in measures:
+        if (len(measure.recurse().notes) > 0):
+            hasnotes = True
+    if (not hasnotes):
+        return
+
     plt.figure(figsize=(20, 4))
     for measure in measures:
 

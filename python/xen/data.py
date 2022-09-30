@@ -58,8 +58,7 @@ class SongData:
                     minPitch = min(minPitch, minMeasurePitch)
                     maxPitch = max(maxPitch, maxMeasurePitch)
                     sequence = np.append(sequence, measureSeq, 0)
-                    print(sequence.shape)
-                sequences += sequence
+                sequences = np.append(sequences, [sequence], 0)
         return sequences, minPitch, maxPitch
         
     def makeSequenceFromMeasure(self, measure, ticksPerQuarter):

@@ -10,15 +10,16 @@ MAX_NOTE = 127
 
 
 class SongData:
-    score = None
-    sequence = []
-
-    def __init__(self, score):
+    def __init__(self, score, filePath):
         self.score = score
+        self.filePath = filePath
+        self.sequences = None
+        self.minPitch = None
+        self.maxPitch = None
 
     @classmethod
-    def fromMidiFile(cls, pathfile):
-        return cls(converter.parse(pathfile))
+    def fromMidiFile(cls, filePath):
+        return cls(converter.parse(filePath), filePath)
 
     def getParts(self):
         return self.score.getElementsByClass(stream.Part)
@@ -46,7 +47,7 @@ class SongData:
             measuresPerSequence: number of measures to create each sequence from
             timesig: only use mesaures with given time signature
         """
-        sequences = np.empty((0, ticksPerQuarter*measuresPerSequence*4, NUM_NOTES))
+        self.sequences = np.empty((0, ticksPerQuarter*measuresPerSequence*4, NUM_NOTES))
         minPitch = 127
         maxPitch = 0
         for part in self.getParts():
@@ -58,8 +59,10 @@ class SongData:
                     minPitch = min(minPitch, minMeasurePitch)
                     maxPitch = max(maxPitch, maxMeasurePitch)
                     sequence = np.append(sequence, measureSeq, 0)
-                sequences = np.append(sequences, [sequence], 0)
-        return sequences, minPitch, maxPitch
+                self.sequences = np.append(self.sequences, [sequence], 0)
+        self.minPitch = minPitch
+        self.maxPitch = maxPitch
+        return self.sequences, self.minPitch, self.maxPitch
         
     def makeSequenceFromMeasure(self, measure, ticksPerQuarter):
         sequence = np.zeros((int(measure.duration.quarterLength * ticksPerQuarter), NUM_NOTES))        
@@ -108,11 +111,9 @@ class SongData:
 
     
 class SequenceDataSet:
-    songs = []
-    ticksPerQuarter = 4
-    
     def __init__(self, ticksPerQuarter = 4):
         self.songs = []
+        self.sequences = None
         self.ticksPerQuarter = ticksPerQuarter
 
     def loadMidiDir(self, path):
@@ -139,79 +140,32 @@ class SequenceDataSet:
                 filtered.append(songdata)
         self.songs = filtered
 
+    def makeSequences(self, ticksPerQuarter=4, measuresPerSequence=4, match_timesig='4/4'):
+        self.sequences = np.empty((0, ticksPerQuarter*measuresPerSequence*4, NUM_NOTES))
+        minPitch = 127
+        maxPitch = 0
+        for song in self.songs:
+            try:
+                songSequences, minSongPitch, maxSongPitch = song.makeSequences(ticksPerQuarter, measuresPerSequence, match_timesig)
+                minPitch = min(minPitch, minSongPitch)
+                maxPitch = max(maxPitch, maxSongPitch)
+                self.sequences = np.append(self.sequences, songSequences, 0)
+            except Exception as e:
+                raise Exception(f'File: {song.filePath}')
+
+        self.minPitch = minPitch
+        self.maxPitch = maxPitch
+        return self.sequences, self.minPitch, self.maxPitch
 
 
-
-
-
-
-def getPartSequences(part, ticksPerQuarter=1, measuresPerSequence=4):
-    sequences = []
-    numNotes = 128
-    minPitch = 127
-    maxPitch = 0
-    measures = part.getElementsByClass(stream.Measure)
-    for measure in measures:
-        measureSeq, minMeasurePitch, maxMeasurePitch = getMeasureSequence(measure, ticksPerQuarter)
-        # print(measureSeq.shape)
-        minPitch = min(minPitch, minMeasurePitch)
-        maxPitch = max(maxPitch, maxMeasurePitch)
-        sequences.append(measureSeq)
-
-    sequences = np.array(sequences)
-
-    # groups measures into phrases of length measuresPerSequence
-    phraseSequences = np.empty((0, sequences.shape[1]*measuresPerSequence, numNotes))
-    phraseSequence = np.empty((0, numNotes))
-    measureCount = 0
-    for sequence in sequences:
-        if (measureCount < measuresPerSequence):
-            phraseSequence = np.append(phraseSequence, sequence, 0)
-            measureCount += 1 
-        else:
-            phraseSequences = np.append(phraseSequences, [phraseSequence], 0)
-            phraseSequence = np.empty((0, numNotes))
-            measureCount = 0
-
-    return phraseSequences, minPitch, maxPitch
-
-
-def getMeasureSequence(measure, ticksPerQuarter=1):
-    numNotes = 128
-    sequence = np.zeros((int(measure.duration.quarterLength * ticksPerQuarter), numNotes))
-    
-    minPitch = 127
-    maxPitch = 0
-    for element in measure.recurse().notes:
-        offset = element.offset * ticksPerQuarter
-        if element.isNote:
-            if(not offset.is_integer()):
-                raise ValueError(f'ERROR: note offset is not an integer: {offset}')
-            sequence[int(offset)][element.pitch.midi] = 1
-            minPitch = min(minPitch, element.pitch.midi)
-            maxPitch = max(maxPitch, element.pitch.midi)
-        if element.isChord:
-            for note in element.notes:
-                if(not offset.is_integer()):
-                    raise ValueError(f'ERROR: note offset is not an integer: {offset}')
-                sequence[int(offset)][note.pitch.midi] = 1
-                minPitch = min(minPitch, note.pitch.midi)
-                maxPitch = max(maxPitch, note.pitch.midi)
-
-    return sequence, minPitch, maxPitch
-
-
-# remove all scores that have time signatures not matching specified
-
-
-def filterFractionalOffsets(scores):
-    filtered = []
-    for score in scores:
-        include = True
-        notes = score.recurse().notes
-        for note in notes:
-            if (isinstance(note.offset, fractions.Fraction)):
-                include = False
-        if (include):
-            filtered.append(score)
-    return filtered
+# def filterFractionalOffsets(scores):
+#     filtered = []
+#     for score in scores:
+#         include = True
+#         notes = score.recurse().notes
+#         for note in notes:
+#             if (isinstance(note.offset, fractions.Fraction)):
+#                 include = False
+#         if (include):
+#             filtered.append(score)
+#     return filtered

@@ -37,11 +37,11 @@ def plotMeasures(measures):
     plt.show()
 
 
-def plotSequence(sequence):
+def plotSparseNoteSequence(sequence, threshold=0.5):
     plt.figure(figsize=(20, 4))
     for i, tick in enumerate(sequence):
         for j, note in enumerate(tick):
-            if(note > 0.5):
+            if(note > threshold):
                 plt.plot([i, i], [j, j], color='b', marker='.')
 
     plt.xlabel('Ticks')

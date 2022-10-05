@@ -84,6 +84,8 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
                 sequences = np.append(sequences, song.sequences, 0)
             except Exception as e:
                 raise Exception(f'File: {song.filePath}')
+        self.createDict(sequences)
+        sequences = self.compress(sequences)
         dataset.sequences = sequences
         return sequences
 

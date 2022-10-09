@@ -6,6 +6,12 @@ import numpy as np
 NUM_NOTES = 128
 
 class SparseNoteSequenceCodec(Codec):
+    """
+    Scores are split into fixed length phrases based on a number of measures
+    Each phrase is represented by a 2 dimensional array. 
+    Dimension 1 = time, measured in ticks
+    Dimension 2 = pitch, where each note on event will be represented by a number 1 
+    """
     def __init__(self, ticksPerQuarter:int=4, measuresPerSequence:int=1, timesignature:str='4/4'):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
@@ -70,11 +76,38 @@ class SparseNoteSequenceCodec(Codec):
         return data
 
 
+class ArrayCompressor():
+    """
+    Compress an array by removing unused data points
+    """
+    def __init__(self):
+        self.removeIndexes = []
+
+    def init(self, dataset):
+        self.removeIndexes = []
+        maxes = np.amax(dataset, axis = 0)
+        for i, max in enumerate(maxes):
+            if (max == 0):
+                self.removeIndexes.append(i)
+    
+    def compress(self, dataset):
+        return np.delete(dataset, self.removeIndexes, axis = 1)
+
+    def decompress(self, dataset):
+        for removedIndex in self.removeIndexes:
+            dataset = np.insert(dataset, removedIndex, 0, axis = 1)
+        return dataset
+
+
 class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
+    """
+    Takes a SparseNoteSequence and flattens it into 1 dimension.
+    Compresses the resulting array by removing all data points that are never used.
+    """
     def __init__(self, ticksPerQuarter:int=4, measuresPerSequence:int=1, timesignature:str='4/4'):
         super().__init__(ticksPerQuarter, measuresPerSequence, timesignature)
         self.encodedShape = (ticksPerQuarter*measuresPerSequence*4*NUM_NOTES,)
-        self.removeIndexes = []
+        self.compressor = ArrayCompressor()
 
     def initEncode(self, dataset: SongDataSet):
         sequences = np.empty((0,)+self.encodedShape)
@@ -84,18 +117,10 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
                 sequences = np.append(sequences, song.sequences, 0)
             except Exception as e:
                 raise Exception(f'File: {song.filePath}')
-        self.createDict(sequences)
-        sequences = self.compress(sequences)
+        self.compressor.init(sequences)
+        sequences = self.compressor.compress(sequences)
         dataset.sequences = sequences
         return sequences
-
-    def createDict(self, sequences):
-        """ Makes list of indexes to remove from flattened sequence because they never have a value """
-        maxes = np.amax(sequences, axis = 0)
-        self.removeIndexes = []
-        for i, max in enumerate(maxes):
-            if (max == 0):
-                self.removeIndexes.append(i)
 
     def encode(self, song: SongData, compress: bool = True):
         """
@@ -106,25 +131,35 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
         sequences = super().encode(song)
         sequences = self.flatten(sequences)
         if(compress):
-            sequences = self.compress(sequences)
+            sequences = self.compressor.compress(sequences)
         song.sequences = sequences
         return sequences
 
     def flatten(self, sequences):
         return sequences.reshape(sequences.shape[0], self.encodedShape[0])
 
-    def compress(self, sequences):
-        return np.delete(sequences, self.removeIndexes, axis = 1)
-
     def decode(self, sequences):
-        sequences = self.decompress(sequences)
+        sequences = self.compressor.decompress(sequences)
         sequences = self.unflatten(sequences)
         return super().decode(sequences)
 
     def unflatten(self, data):
         return data.reshape(data.shape[0], self.sequenceShape[0], self.sequenceShape[1])
 
-    def decompress(self, sequences):
-        for removedIndex in self.removeIndexes:
-            sequences = np.insert(sequences, removedIndex, 0, axis = 1)
-        return sequences
+
+class ChordifiedSequenceCodec(SparseNoteSequenceCodec):
+    """Identify each unique set of notes as a chord and one-hot encode each chord """
+    def __init__(self, ticksPerQuarter:int = 4, measuresPerSequence:int = 1, timesignature:str = '4/4'):
+        self.ticksPerQuarter = ticksPerQuarter
+        self.measuresPerSequence = measuresPerSequence
+        self.timesignature = timesignature
+        self.chordList = []
+
+    def initEncode(self, dataset: SongDataSet):
+        pass
+
+    def encode(self, song: SongData):
+        pass
+
+    def decode(self, sequences):
+        pass

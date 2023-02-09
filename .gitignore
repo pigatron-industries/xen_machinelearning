@@ -128,4 +128,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Platform IO IDE
+.pio
+.clang_complete
+.gcc-flags.json
+.vscode
+
+/tmp
+
 .DS_Store

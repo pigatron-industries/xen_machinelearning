@@ -104,12 +104,13 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
     Takes a SparseNoteSequence and flattens it into 1 dimension.
     Compresses the resulting array by removing all data points that are never used.
     """
-    def __init__(self, ticksPerQuarter:int=4, measuresPerSequence:int=1, timesignature:str='4/4'):
+    def __init__(self, ticksPerQuarter:int=4, measuresPerSequence:int=1, timesignature:str='4/4', compress = True):
         super().__init__(ticksPerQuarter, measuresPerSequence, timesignature)
         self.encodedShape = (ticksPerQuarter*measuresPerSequence*4*NUM_NOTES,)
+        self.compress = compress
         self.compressor = ArrayCompressor()
 
-    def initEncode(self, dataset: SongDataSet):
+    def encodeAll(self, dataset: SongDataSet):
         sequences = np.empty((0,)+self.encodedShape)
         for song in dataset.songs:
             try:
@@ -117,8 +118,9 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
                 sequences = np.append(sequences, song.sequences, 0)
             except Exception as e:
                 raise Exception(f'File: {song.filePath}')
-        self.compressor.init(sequences)
-        sequences = self.compressor.compress(sequences)
+        if(self.compress):
+            self.compressor.init(sequences)
+            sequences = self.compressor.compress(sequences)
         dataset.sequences = sequences
         return sequences
 
@@ -130,7 +132,7 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
         """
         sequences = super().encode(song)
         sequences = self.flatten(sequences)
-        if(compress):
+        if(compress and self.compress):
             sequences = self.compressor.compress(sequences)
         song.sequences = sequences
         return sequences
@@ -139,7 +141,8 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
         return sequences.reshape(sequences.shape[0], self.encodedShape[0])
 
     def decode(self, sequences):
-        sequences = self.compressor.decompress(sequences)
+        if(self.compress):
+            sequences = self.compressor.decompress(sequences)
         sequences = self.unflatten(sequences)
         return super().decode(sequences)
 
@@ -148,7 +151,9 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
 
 
 class ChordifiedSequenceCodec(SparseNoteSequenceCodec):
-    """Identify each unique set of notes as a chord and one-hot encode each chord """
+    """
+    Identify each unique set of notes as a chord and one-hot encode each chord
+    """
     def __init__(self, ticksPerQuarter:int = 4, measuresPerSequence:int = 1, timesignature:str = '4/4'):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence

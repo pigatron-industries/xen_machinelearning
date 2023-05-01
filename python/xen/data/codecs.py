@@ -11,15 +11,16 @@ class SparseNoteSequenceCodec(Codec):
     Each phrase is represented by a 2 dimensional array. 
     Dimension 1 = time, measured in ticks
     Dimension 2 = pitch, where each note on event will be represented by a number 1 
+    timeSignature: string representing the time signature of the score, used to make sure consecutive measures are all the same time signature
     """
-    def __init__(self, ticksPerQuarter:int=4, measuresPerSequence:int=1, timesignature:str='4/4'):
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4'):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
         self.timesignature = timesignature
-        self.sequenceShape = (ticksPerQuarter*measuresPerSequence*4, NUM_NOTES)
+        self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
         self.encodedShape = self.sequenceShape
 
-    def initEncode(self, dataset: SongDataSet):
+    def encodeAll(self, dataset: SongDataSet):
         sequences = np.empty((0,)+self.encodedShape)
         for song in dataset.songs:
             try:
@@ -104,9 +105,9 @@ class FlatNoteSequenceCodec(SparseNoteSequenceCodec):
     Takes a SparseNoteSequence and flattens it into 1 dimension.
     Compresses the resulting array by removing all data points that are never used.
     """
-    def __init__(self, ticksPerQuarter:int=4, measuresPerSequence:int=1, timesignature:str='4/4', compress = True):
-        super().__init__(ticksPerQuarter, measuresPerSequence, timesignature)
-        self.encodedShape = (ticksPerQuarter*measuresPerSequence*4*NUM_NOTES,)
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', compress = True):
+        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature)
+        self.encodedShape = (ticksPerQuarter*measuresPerSequence*quartersPerMeasure*NUM_NOTES,)
         self.compress = compress
         self.compressor = ArrayCompressor()
 

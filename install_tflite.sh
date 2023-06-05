@@ -1,4 +1,5 @@
 #!/bin/bash
+# https://github.com/tensorflow/tflite-micro/blob/main/tensorflow/lite/micro/docs/new_platform_support.md
 
 if [ -d "tmp/tflite-micro" ]; then
     cd tmp/tflite-micro
@@ -6,14 +7,15 @@ if [ -d "tmp/tflite-micro" ]; then
 else
     mkdir -p tmp
     cd tmp
-    # git clone https://github.com/tensorflow/tflite-micro.git
-    git clone https://github.com/tensorflow/tflite-micro-arduino-examples.git tflite-micro
+    git clone https://github.com/tensorflow/tflite-micro.git
     cd tflite-micro
 fi
 
-cd ../..
+rm -rf tflm-tree
+python tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py -e hello_world ../tflm-tree
 
-rm -rf lib/tflite-micro
-mkdir -p lib/tflite-micro/tensorflow
-cp -r ./tmp/tflite-micro/src/tensorflow/lite ./lib/tflite-micro/tensorflow/lite
-cp -r ./tmp/tflite-micro/src/third_party ./lib/tflite-micro/third_party
+cd ../..
+rm -rf src/tflite
+mkdir -p src/tflite
+cp -r ./tmp/tflm-tree/tensorflow ./src/tflite/tensorflow
+cp -r ./tmp/tflm-tree/third_party ./src/tflite/third_party

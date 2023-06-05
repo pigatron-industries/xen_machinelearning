@@ -5,6 +5,10 @@ import glob
 import numpy as np
 import fractions
 
+from ipywidgets import IntProgress, Label
+from IPython.display import display
+
+
 NUM_NOTES = 128
 MIN_NOTE = 0
 MAX_NOTE = 127
@@ -72,65 +76,74 @@ class SongData:
     def getOverlappingMeasures(self, part, measuresPerSequence, match_timesig):
         pass 
 
-
-class Codec:
-    def __init__(self):
-        self.encodedShape = None
-    def initEncode(self, dataset):
-        pass
-    def encode(self, data):
-        pass
-    def decode(self, data):
-        pass
-
     
 class SongDataSet:
-    def __init__(self, ticksPerQuarter = 4):
-        self.songs = []
+    def __init__(self, songs = None):
+        if songs is not None:
+            self.songs = songs
+        else:
+            self.songs = []
         self.sequences = None
-        self.ticksPerQuarter = ticksPerQuarter
-        self.compressedSequences = None
-        self.sequenceCompressor = None
+        self.encodedSequences = None
 
-    def loadMidiDir(self, path):
-        files = glob.glob(path + "/*.mid")
+
+    def loadMidiDir(self, path, recursive = False):
+        if recursive:
+            files = glob.glob(path + "/**/*.mid", recursive=True)
+        else:
+            files = glob.glob(path + "/*.mid", recursive=False)
         print(f'Loading {len(files)} files')
         self.loadMidiFiles(files)
 
+
     def loadMidiFiles(self, files):
-        for file in files:
+        progress = IntProgress(min=0, max=len(files))
+        label = Label()
+        display(progress, label)
+        for i, file in enumerate(files):
             song = SongData.fromMidiFile(file)
             self.songs.append(song)
+            progress.value = i + 1
+            label.value = f'{i + 1}/{len(files)}'
+
+        print(f'Loaded {len(self.songs)} songs')
+
 
     def filterTimeSig(self, match_timesig):
         filtered = []
         for songdata in self.songs:
             if songdata.hasTimeSig(match_timesig):
                 filtered.append(songdata)
-        self.songs = filtered
+        print(f'Filtered to {len(filtered)} songs')
+        return SongDataSet(filtered)
+
 
     def filterTimeSigOnly(self, match_timesig):
         filtered = []
         for songdata in self.songs:
             if songdata.hasOnlyTimeSig(match_timesig):
                 filtered.append(songdata)
-        self.songs = filtered
+        print(f'Filtered to {len(filtered)} songs')
+        return SongDataSet(filtered)
+
 
     def filterFractionalOffsets(self, ticksPerQuarter=4):
         filtered = []
         for songdata in self.songs:
             if (not songdata.hasFractionalOffsets(ticksPerQuarter)):
                 filtered.append(songdata)
-        self.songs = filtered
+        print(f'Filtered to {len(filtered)} songs')
+        return SongDataSet(filtered)
 
-    def encodeSongs(self, codec: Codec):
-        self.sequences = np.empty((0,)+codec.encodedShape)
+
+    def splitByTimeSignature(self):
+        timesigsdict = {}
         for song in self.songs:
-            try:
-                songSequences = codec.encode(song)
-                song.sequences = songSequences
-                self.sequences = np.append(self.sequences, songSequences, 0)
-            except Exception as e:
-                raise Exception(f'File: {song.filePath}')
-        return self.sequences
+            timesigs = song.score.recurse().getElementsByClass(meter.TimeSignature)
+            for timesig in timesigs:
+                timsiglabel = f'{timesig.numerator}/{timesig.denominator}'
+                if timsiglabel not in timesigsdict:
+                    timesigsdict[timsiglabel] = SongDataSet()
+                timesigsdict[timsiglabel].songs.append(song)
+        return timesigsdict
  

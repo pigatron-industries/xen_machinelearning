@@ -1,3 +1,4 @@
+from .AbstractModel import AbstractModel
 from tensorflow.python.framework.ops import disable_eager_execution
 from tensorflow.keras.layers import Input, Dense, Layer, Lambda
 from tensorflow.keras.models import Model, load_model
@@ -6,18 +7,8 @@ from tensorflow.keras import backend as K
 from tensorflow.keras import metrics
 from tensorflow.keras.utils import custom_object_scope
 import tensorflow as tf
+import os
 
-
-class Sampling(Layer):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-    def call(self, inputs):
-        meanLayer, logVarLayer = inputs
-        batch = tf.shape(meanLayer)[0]
-        dim = tf.shape(meanLayer)[1]
-        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
-        return meanLayer + tf.exp(0.5 * logVarLayer) * epsilon
-    
 
 def sampling(args):
     meanLayer, logVarLayer = args
@@ -27,15 +18,14 @@ def sampling(args):
     return meanLayer + K.exp(0.5 * logVarLayer) * epsilon
 
 
-class VariationalAutoEncoder:
+class VariationalAutoEncoder(AbstractModel):
     def __init__(self, layerDims = None, path = None, name = None):
-        self.path = path
-        self.name = name
+        super().__init__(path, name)
         disable_eager_execution()
         if layerDims is not None:
             self.create(layerDims)
         else:
-            self.load(path, name)
+            self.load()
             
 
     def create(self, layerDims = [2048, 512, 128, 32]):
@@ -95,15 +85,17 @@ class VariationalAutoEncoder:
         return self.vaeModel.predict(inputdata)
     
 
-    def save(self, path, name, metadata):
-        self.vaeModel.metadata = metadata
-        self.decoderModel.metadata = metadata
-        self.vaeModel.save(f"{path}/{name}_vae.h5")
-        self.decoderModel.save(f"{path}/{name}_decoder.h5")
+    def save(self):
+        vaeName = f"{self.name}_vae"
+        decoderName = f"{self.name}_decoder"
+        self.saveModel(self.vaeModel, vaeName, "h5")
+        self.saveModel(self.decoderModel, decoderName, "h5")
+        self.saveModel(self.decoderModel, decoderName, "tflite")
 
 
-    def load(self, path, name):
-        self.vaeModel = load_model(f"{path}/{name}_vae.h5", compile=False)
+    def load(self):
+        vaeName = f"{self.name}_vae"
+        self.vaeModel = self.loadModel(vaeName)
         self.encoderInputLayer = self.vaeModel.get_layer('encoder_input')
         self.meanLayer = self.vaeModel.get_layer('encoder_mean')
         self.logVarLayer = self.vaeModel.get_layer('encoder_logvar')
@@ -111,7 +103,8 @@ class VariationalAutoEncoder:
         self.vaeOutputLayer = self.vaeModel.get_layer('decoder')
         self.vaeModel.summary()
 
-        self.decoderModel = load_model(f"{path}/{name}_decoder.h5", compile=False)                                              
+        decoderName = f"{self.name}_decoder"
+        self.decoderModel = self.loadModel(decoderName)
         self.decoderInputLayer = self.decoderModel.get_layer('decoder_input')
         self.decoderOutputLayer = self.decoderModel.get_layer('decoder_output')
         self.decoderModel.summary()
@@ -122,7 +115,5 @@ class VariationalAutoEncoder:
         for i in range(len(self.vaeModel.layers)):
             if 'encoder_internal' in self.vaeModel.layers[i].name:
                 self.internalDims.append(self.vaeModel.layers[i].output_shape[1])
-                
-        return self.decoderModel.metadata
 
 

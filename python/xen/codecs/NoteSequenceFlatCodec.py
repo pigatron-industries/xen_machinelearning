@@ -33,8 +33,9 @@ class NoteSequenceFlatCodec(NoteSequenceSparseCodec):
     Takes a SparseNoteSequence and flattens it into 1 dimension.
     Compresses the resulting array by removing all data points that are never used.
     """
-    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', trim = True, compress = False):
-        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature)
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', 
+                 trim:bool=True, compress:bool=False, normaliseOctave:bool=True):
+        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature, normaliseOctave=normaliseOctave)
         self.encodedShape = (ticksPerQuarter*measuresPerSequence*quartersPerMeasure*NUM_NOTES,)
         self.compress = compress
         self.trim = trim

@@ -15,13 +15,14 @@ class NoteSequenceSparseCodec(Codec):
     Dimension 2 = pitch, where each note on event will be represented by a number 1 
     timeSignature: string representing the time signature of the score, used to make sure consecutive measures are all the same time signature
     """
-    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4'):
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', normaliseOctave:bool=True):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
         self.quartersPerMeasure = quartersPerMeasure
         self.timesignature = timesignature
         self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
         self.encodedShape = self.sequenceShape
+        self.normaliseOctave = normaliseOctave
 
     def encodeAll(self, dataset: SongDataSet):
         sequences = np.empty((0,)+self.sequenceShape)
@@ -63,17 +64,36 @@ class NoteSequenceSparseCodec(Codec):
         return sequences
 
     def makeSequenceFromMeasure(self, measure: stream.Measure):
-        sequence = np.zeros((int(measure.duration.quarterLength * self.ticksPerQuarter), NUM_NOTES)) 
+        sequence = np.zeros((int(measure.duration.quarterLength * self.ticksPerQuarter), NUM_NOTES))
+        if(self.normaliseOctave):
+            lowestNote = self.getLowestNote(measure)
+            lowestOctave = int(lowestNote/12)
+            transpose = lowestOctave * 12
+        else:
+            transpose = 0
+            
         for element in measure.recurse().notes:
             offset = element.offset * self.ticksPerQuarter
             if(not isInteger(offset)):
                 raise ValueError(f'ERROR: note offset is not an integer: {offset}')
             if element.isNote:
-                sequence[int(offset)][element.pitch.midi] = 1
+                midi = element.pitch.midi-transpose
+                sequence[int(offset)][midi] = 1
             if element.isChord:
                 for note in element.notes:
-                    sequence[int(offset)][note.pitch.midi] = 1
+                    midi = note.pitch.midi-transpose
+                    sequence[int(offset)][midi] = 1
         return sequence
+    
+    def getLowestNote(self, measure: stream.Measure):
+        lowestNote = 128
+        for element in measure.recurse().notes:
+            if element.isNote:
+                lowestNote = min(lowestNote, element.pitch.midi)
+            if element.isChord:
+                for note in element.notes:
+                    lowestNote = min(lowestNote, note.pitch.midi)
+        return lowestNote
 
     def decode(self, data):
         # TODO

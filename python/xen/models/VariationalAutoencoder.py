@@ -34,6 +34,7 @@ class VariationalAutoEncoder(AbstractModel):
         self.latentDim = layerDims[-1]
         # encoder model
         self.encoderInputLayer = Input(self.inputDim, name='encoder_input')
+        encoderInternalLayer = self.encoderInputLayer
         internalInputLayer = self.encoderInputLayer
         for i, dim in enumerate(self.internalDims):
             encoderInternalLayer = Dense(dim, activation='relu', name=f'encoder_internal_{i}')(internalInputLayer)
@@ -45,6 +46,7 @@ class VariationalAutoEncoder(AbstractModel):
         self.encoderModel.summary()
         # decoder model
         self.decoderInputLayer = Input(self.latentDim, name='decoder_input')
+        decoderInternalLayer = self.decoderInputLayer
         internalInputLayer = self.decoderInputLayer
         for i, dim in enumerate(self.internalDims[::-1]):
             decoderInternalLayer = Dense(dim, activation='relu', name=f'decoder_internal_{i}')(internalInputLayer)
@@ -85,12 +87,12 @@ class VariationalAutoEncoder(AbstractModel):
         return self.vaeModel.predict(inputdata)
     
 
-    def save(self):
+    def save(self, quantize = None, metadata = None):
         vaeName = f"{self.name}_vae"
         decoderName = f"{self.name}_decoder"
-        self.saveModel(self.vaeModel, vaeName, "h5")
-        self.saveModel(self.decoderModel, decoderName, "h5")
-        self.saveModel(self.decoderModel, decoderName, "tflite")
+        self.saveModelH5(self.vaeModel, vaeName)
+        self.saveModelH5(self.decoderModel, decoderName)
+        self.saveModelTfLite(self.decoderModel, decoderName, quantize, metadata)
 
 
     def load(self):

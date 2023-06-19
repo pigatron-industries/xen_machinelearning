@@ -4,6 +4,7 @@ from xen.utils import isInteger
 import glob
 import numpy as np
 import fractions
+import numpy as np
 
 from ipywidgets import IntProgress, Label
 from IPython.display import display
@@ -83,8 +84,19 @@ class SongDataSet:
             self.songs = songs
         else:
             self.songs = []
-        self.sequences = None
+        self.sequences:np.ndarray = np.array([])
         self.encodedSequences = None
+
+
+    @classmethod
+    def fromMidiDir(cls, path, recursive = False):
+        dataset = cls()
+        dataset.loadMidiDir(path, recursive)
+        return dataset
+
+
+    def getDataset(self):
+        return self.sequences
 
 
     def loadMidiDir(self, path, recursive = False):

@@ -1,0 +1,22 @@
+{
+    "name": "Arduino Tensorflow Lite",
+    "version": "0.0.1",
+    "description": "Tensforflow Lite library modified for Arduino/Teensy",
+    "keywords": "tensorflow, tflite",
+    "repository":
+    {
+      "type": "git",
+      "url": "https://github.com/pigatron-industries/xen_machinelearning.git"
+    },
+    "authors":
+    [
+      {
+        "name": "Robert Ellis"
+      }
+    ],
+    "license": "Apache 2.0",
+    "dependencies": {
+    },
+    "frameworks": "arduino",
+    "platforms": "*"
+  }

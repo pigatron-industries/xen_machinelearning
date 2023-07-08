@@ -93,6 +93,13 @@ class SongDataSet:
         dataset = cls()
         dataset.loadMidiDir(path, recursive)
         return dataset
+    
+
+    @classmethod
+    def fromMidiFiles(cls, files):
+        dataset = cls()
+        dataset.loadMidiFiles(files)
+        return dataset
 
 
     def getDataset(self):

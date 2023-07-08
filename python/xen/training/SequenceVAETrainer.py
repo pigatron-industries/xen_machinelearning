@@ -54,9 +54,10 @@ class SequenceVAETrainer:
         self.model.compile(optimizer=Adam(learning_rate=0.005))
 
 
-    def train(self, batchSize = 32, epochs = 500):
+    def train(self, batchSize = 32, epochs = 500, learning_rate = 0.005):
         if self.model is None:
             raise Exception('Model not set')
+        self.model.compile(optimizer=Adam(learning_rate=learning_rate))
         self.model.train(self.dataset.getDataset(), batchSize = batchSize, epochs = epochs)
 
 

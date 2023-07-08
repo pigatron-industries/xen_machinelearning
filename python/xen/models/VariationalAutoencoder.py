@@ -89,7 +89,7 @@ class VariationalAutoEncoder(AbstractModel):
 
     def save(self, quantize = None, metadata = None):
         vaeName = f"{self.name}_vae"
-        decoderName = f"{self.name}_decoder"
+        decoderName = f"{self.name}_dec"
         self.saveModelH5(self.vaeModel, vaeName)
         self.saveModelH5(self.decoderModel, decoderName)
         self.saveModelTfLite(self.decoderModel, decoderName, quantize, metadata)

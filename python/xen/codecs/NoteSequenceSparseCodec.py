@@ -1,7 +1,9 @@
 from .Codec import Codec
 from music21 import stream
+from music21.stream.base import Score, Part, Measure
 from xen.data.SongData import SongData, SongDataSet
 from xen.utils import isInteger
+from typing import Callable
 import numpy as np
 
 
@@ -15,14 +17,19 @@ class NoteSequenceSparseCodec(Codec):
     Dimension 2 = pitch, where each note on event will be represented by a number 1 
     timeSignature: string representing the time signature of the score, used to make sure consecutive measures are all the same time signature
     """
-    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', normaliseOctave:bool=True):
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', normaliseOctave:bool=True, 
+                 percussionMap:None|Callable[[int], int]=None):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
         self.quartersPerMeasure = quartersPerMeasure
         self.timesignature = timesignature
         self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
         self.encodedShape = self.sequenceShape
-        self.normaliseOctave = normaliseOctave
+        self.percussionMap = percussionMap
+        if(self.percussionMap is None):
+            self.normaliseOctave = False
+        else:
+            self.normaliseOctave = normaliseOctave
 
     def encodeAll(self, dataset: SongDataSet):
         sequences = np.empty((0,)+self.sequenceShape)
@@ -45,7 +52,7 @@ class NoteSequenceSparseCodec(Codec):
         song.sequences = sequences
         return sequences
 
-    def makeSequencesFromSong(self, song: SongData):
+    def makeSequencesFromSong(self, song: SongData) -> np.ndarray:
         sequences = np.empty((0,)+self.sequenceShape)
         ignoredSequences = 0
         for part in song.getParts():
@@ -63,7 +70,7 @@ class NoteSequenceSparseCodec(Codec):
             print(f'Ignored {ignoredSequences} sequences from {song.filePath}')
         return sequences
 
-    def makeSequenceFromMeasure(self, measure: stream.Measure):
+    def makeSequenceFromMeasure(self, measure: Measure):
         sequence = np.zeros((int(measure.duration.quarterLength * self.ticksPerQuarter), NUM_NOTES))
         if(self.normaliseOctave):
             lowestNote = self.getLowestNote(measure)
@@ -74,16 +81,23 @@ class NoteSequenceSparseCodec(Codec):
             
         for element in measure.recurse().notes:
             offset = element.offset * self.ticksPerQuarter
-            if(not isInteger(offset)):
-                raise ValueError(f'ERROR: note offset is not an integer: {offset}')
             if element.isNote:
-                midi = element.pitch.midi-transpose
-                sequence[int(offset)][midi] = 1
+                self.addNoteToSequence(sequence, element.pitch.midi, offset, transpose)
             if element.isChord:
                 for note in element.notes:
-                    midi = note.pitch.midi-transpose
-                    sequence[int(offset)][midi] = 1
+                    self.addNoteToSequence(sequence, note.pitch.midi, offset, transpose)
         return sequence
+    
+
+    def addNoteToSequence(self, sequence, midinote, offset, transpose=0):
+        if(not isInteger(offset)):
+            raise ValueError(f'ERROR: note offset is not an integer: {offset}')
+        if(self.percussionMap is not None):
+            midinote = self.percussionMap(midinote)
+        else:
+            midinote = midinote - transpose
+        sequence[int(offset)][midinote] = 1
+
     
     def getLowestNote(self, measure: stream.Measure):
         lowestNote = 128

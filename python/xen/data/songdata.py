@@ -1,4 +1,5 @@
 from music21 import converter, pitch, interval, instrument, note, stream, meter
+from music21.stream.base import Score
 from enum import Enum
 from xen.utils import isInteger
 import glob
@@ -16,16 +17,20 @@ MAX_NOTE = 127
 
 
 class SongData:
-    def __init__(self, score, filePath):
-        self.score = score
-        self.filePath = filePath
+    def __init__(self, score:Score, filePath:str):
+        self.score: Score = score
+        self.filePath: str = filePath
         self.sequences = None
         self.minPitch = None
         self.maxPitch = None
 
     @classmethod
     def fromMidiFile(cls, filePath):
-        return cls(converter.parse(filePath), filePath)
+        score = converter.parse(filePath)
+        if (isinstance(score, Score)):
+            return cls(score, filePath)
+        else:
+            raise Exception(f'score not instance of Score: {filePath}')
 
     def getParts(self):
         return self.score.getElementsByClass(stream.Part)

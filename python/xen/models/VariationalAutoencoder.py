@@ -49,7 +49,6 @@ class VariationalAutoEncoder(AbstractModel):
         self.latentDim = layerDims[-1]
         # encoder model
         self.encoderInputLayer = Input(self.inputDim, name='encoder_input')
-        print(type(self.encoderInputLayer))
         encoderInternalLayer = self.encoderInputLayer
         internalInputLayer = self.encoderInputLayer
         for i, dim in enumerate(self.internalDims):
@@ -72,7 +71,6 @@ class VariationalAutoEncoder(AbstractModel):
         self.decoderModel.summary()
         # autoencoder model
         self.vaeInputLayer = self.encoderInputLayer
-        print(type(self.encoderInputLayer))
         self.vaeOutputLayer = self.decoderModel(self.samplingLayer)
         self.vaeModel = Model(self.encoderInputLayer, self.vaeOutputLayer, name='autoencoder')
         self.vaeModel.summary()
@@ -125,8 +123,6 @@ class VariationalAutoEncoder(AbstractModel):
         self.encoderModel = Model(self.encoderInputLayer, [self.meanLayer, self.logVarLayer, self.samplingLayer], name='encoder')
         self.vaeOutputLayer = self.decoderModel.output
         self.vaeModel.summary()
-       
-        print(self.encoderInputLayer.shape)
 
         self.inputDim = self.encoderInputLayer.shape[1]
         self.latentDim = self.meanLayer.shape[1]

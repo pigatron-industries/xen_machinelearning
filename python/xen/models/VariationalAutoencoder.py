@@ -19,14 +19,29 @@ def sampling(args):
 
 
 class VariationalAutoEncoder(AbstractModel):
-    def __init__(self, layerDims = None, path = None, name = None):
+
+    vae_suffix = 'vae'
+    decoder_suffix = 'dec'
+    encoder_suffix = 'enc'
+
+    def __init__(self, path, name):
         super().__init__(path, name)
         disable_eager_execution()
-        if layerDims is not None:
-            self.create(layerDims)
-        else:
-            self.load()
             
+
+    @classmethod
+    def from_pretrained(cls, path, name):
+        model = cls(path = path, name = name)
+        model.load()
+        return model
+
+
+    @classmethod
+    def from_new(cls, layerDims, path, name):
+        model = cls(path = path, name = name)
+        model.create(layerDims=layerDims)
+        return model
+
 
     def create(self, layerDims = [2048, 512, 128, 32]):
         self.inputDim = layerDims[0]
@@ -34,6 +49,7 @@ class VariationalAutoEncoder(AbstractModel):
         self.latentDim = layerDims[-1]
         # encoder model
         self.encoderInputLayer = Input(self.inputDim, name='encoder_input')
+        print(type(self.encoderInputLayer))
         encoderInternalLayer = self.encoderInputLayer
         internalInputLayer = self.encoderInputLayer
         for i, dim in enumerate(self.internalDims):
@@ -56,6 +72,7 @@ class VariationalAutoEncoder(AbstractModel):
         self.decoderModel.summary()
         # autoencoder model
         self.vaeInputLayer = self.encoderInputLayer
+        print(type(self.encoderInputLayer))
         self.vaeOutputLayer = self.decoderModel(self.samplingLayer)
         self.vaeModel = Model(self.encoderInputLayer, self.vaeOutputLayer, name='autoencoder')
         self.vaeModel.summary()
@@ -88,34 +105,58 @@ class VariationalAutoEncoder(AbstractModel):
     
 
     def save(self, quantize = None, metadata = None):
-        vaeName = f"{self.name}_vae"
-        decoderName = f"{self.name}_dec"
+        vaeName = f"{self.name}_{self.vae_suffix}"
+        encoderName = f"{self.name}_{self.encoder_suffix}"
+        decoderName = f"{self.name}_{self.decoder_suffix}"
         self.saveModelH5(self.vaeModel, vaeName)
+        self.saveModelH5(self.encoderModel, encoderName)
         self.saveModelH5(self.decoderModel, decoderName)
         self.saveModelTfLite(self.decoderModel, decoderName, quantize, metadata)
 
 
     def load(self):
-        vaeName = f"{self.name}_vae"
+        # autoencoder model
+        vaeName = f"{self.name}_{self.vae_suffix}"
         self.vaeModel = self.loadModel(vaeName)
-        self.encoderInputLayer = self.vaeModel.get_layer('encoder_input')
-        self.meanLayer = self.vaeModel.get_layer('encoder_mean')
-        self.logVarLayer = self.vaeModel.get_layer('encoder_logvar')
-        self.samplingLayer = self.vaeModel.get_layer('encoder_sampling')
-        self.vaeOutputLayer = self.vaeModel.get_layer('decoder')
+        self.encoderInputLayer = self.vaeModel.get_layer('encoder_input').input
+        self.meanLayer = self.vaeModel.get_layer('encoder_mean').output
+        self.logVarLayer = self.vaeModel.get_layer('encoder_logvar').output
+        self.samplingLayer = self.vaeModel.get_layer('encoder_sampling').output
+        self.decoderModel = self.vaeModel.get_layer('decoder')
+        self.encoderModel = Model(self.encoderInputLayer, [self.meanLayer, self.logVarLayer, self.samplingLayer], name='encoder')
+        self.vaeOutputLayer = self.decoderModel.output
         self.vaeModel.summary()
 
-        decoderName = f"{self.name}_decoder"
-        self.decoderModel = self.loadModel(decoderName)
-        self.decoderInputLayer = self.decoderModel.get_layer('decoder_input')
-        self.decoderOutputLayer = self.decoderModel.get_layer('decoder_output')
+        
+
+        # # encoder model
+        # encoderName = f"{self.name}_{self.encoder_suffix}"
+        # self.encoderModel = self.loadModel(encoderName)
+        # self.encoderInputLayer = self.encoderModel.get_layer('encoder_input').output
+        # self.meanLayer = self.encoderModel.get_layer('encoder_mean').output
+        # self.logVarLayer = self.encoderModel.get_layer('encoder_logvar').output
+        # self.samplingLayer = self.encoderModel.get_layer('encoder_sampling').output
+        self.encoderModel.summary()
+
+        # # decoder model
+        # decoderName = f"{self.name}_{self.decoder_suffix}"
+        # self.decoderModel = self.loadModel(decoderName)
+        # self.decoderInputLayer = self.decoderModel.get_layer('decoder_input').output
+        # self.decoderOutputLayer = self.decoderModel.get_layer('decoder_output').output
         self.decoderModel.summary()
+
+        # # autoencoder model
+        # self.vaeInputLayer = self.encoderInputLayer
+        # print(type(self.encoderInputLayer))
+        # self.vaeOutputLayer = self.decoderModel(self.samplingLayer)
+        # self.vaeModel = Model(self.encoderInputLayer, self.vaeOutputLayer, name='autoencoder')
+        # self.vaeModel.summary()
        
-        self.inputDim = self.encoderInputLayer.output_shape[0][1]
-        self.latentDim = self.meanLayer.output_shape[1]
+        print(self.encoderInputLayer.shape)
+
+        self.inputDim = self.encoderInputLayer.shape[1]
+        self.latentDim = self.meanLayer.shape[1]
         self.internalDims = []
         for i in range(len(self.vaeModel.layers)):
             if 'encoder_internal' in self.vaeModel.layers[i].name:
                 self.internalDims.append(self.vaeModel.layers[i].output_shape[1])
-
-

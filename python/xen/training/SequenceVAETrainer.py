@@ -50,8 +50,12 @@ class SequenceVAETrainer:
             layerDims.append(int(layerDims[-1] / dimDivider))
         layerDims.append(latentDim)
         print(f'Layer dims: {layerDims}')
-        self.model = VariationalAutoEncoder(layerDims=layerDims, name=self.modelName, path=self.modelPath)
+        self.model = VariationalAutoEncoder.from_new(layerDims=layerDims, name=self.modelName, path=self.modelPath)
         self.model.compile(optimizer=Adam(learning_rate=0.005))
+
+
+    def loadModel(self):
+        self.model = VariationalAutoEncoder.from_pretrained(name=self.modelName, path=self.modelPath)
 
 
     def train(self, batchSize = 32, epochs = 500, learning_rate = 0.005):

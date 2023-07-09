@@ -52,5 +52,5 @@ class AbstractModel:
             populator.populate()
 
 
-    def loadModel(self, name):
+    def loadModel(self, name) -> tf.keras.Model:
         return tf.keras.saving.load_model(f"{self.path}/{name}.h5", compile=False)

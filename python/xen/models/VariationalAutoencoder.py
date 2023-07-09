@@ -115,7 +115,6 @@ class VariationalAutoEncoder(AbstractModel):
 
 
     def load(self):
-        # autoencoder model
         vaeName = f"{self.name}_{self.vae_suffix}"
         self.vaeModel = self.loadModel(vaeName)
         self.encoderInputLayer = self.vaeModel.get_layer('encoder_input').input
@@ -126,31 +125,6 @@ class VariationalAutoEncoder(AbstractModel):
         self.encoderModel = Model(self.encoderInputLayer, [self.meanLayer, self.logVarLayer, self.samplingLayer], name='encoder')
         self.vaeOutputLayer = self.decoderModel.output
         self.vaeModel.summary()
-
-        
-
-        # # encoder model
-        # encoderName = f"{self.name}_{self.encoder_suffix}"
-        # self.encoderModel = self.loadModel(encoderName)
-        # self.encoderInputLayer = self.encoderModel.get_layer('encoder_input').output
-        # self.meanLayer = self.encoderModel.get_layer('encoder_mean').output
-        # self.logVarLayer = self.encoderModel.get_layer('encoder_logvar').output
-        # self.samplingLayer = self.encoderModel.get_layer('encoder_sampling').output
-        self.encoderModel.summary()
-
-        # # decoder model
-        # decoderName = f"{self.name}_{self.decoder_suffix}"
-        # self.decoderModel = self.loadModel(decoderName)
-        # self.decoderInputLayer = self.decoderModel.get_layer('decoder_input').output
-        # self.decoderOutputLayer = self.decoderModel.get_layer('decoder_output').output
-        self.decoderModel.summary()
-
-        # # autoencoder model
-        # self.vaeInputLayer = self.encoderInputLayer
-        # print(type(self.encoderInputLayer))
-        # self.vaeOutputLayer = self.decoderModel(self.samplingLayer)
-        # self.vaeModel = Model(self.encoderInputLayer, self.vaeOutputLayer, name='autoencoder')
-        # self.vaeModel.summary()
        
         print(self.encoderInputLayer.shape)
 

@@ -7,15 +7,19 @@ from xen.visualise import plotSparseNoteSequence
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.optimizers.legacy import Adam
+from typing import List, Callable
 
 from matplotlib import pyplot as plt
 
+DECODER_TYPE_SEQ = "seqdec"
+DECODER_TYPE_PERC = "perdec"
+
 
 class SequenceVAEMetaData(ModelMetadata):
-    def __init__(self, notesPerTick, ticksPerSequence):
+    def __init__(self, notesPerTick, ticksPerSequence, type = "seqdec"):
         self.notesPerTick = notesPerTick
         self.ticksPerSequence = ticksPerSequence
-        super().__init__("seqdec", [notesPerTick, ticksPerSequence])
+        super().__init__(type, [notesPerTick, ticksPerSequence])
 
 
 class SequenceVAETrainer:
@@ -34,11 +38,13 @@ class SequenceVAETrainer:
         self.dataset = dataset
 
 
-    def loadSongDataset(self, path:str, recursive:bool = False, timesig = '4/4', ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1):
-        self.dataset = SongDataSet.fromMidiDir(path, recursive).filterTimeSig(timesig)
-        self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesig, trim = True, compress=False, normaliseOctave=True)
+    def loadSongDataset(self, paths:List[str], recursive:bool = False, timesig = '4/4', ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
+                        percussionMap:None|Callable[[int], int] = None):
+        self.dataset = SongDataSet.fromMidiPaths(paths, recursive).filterTimeSig(timesig)
+        self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesig, trim = True, compress=False, normaliseOctave=True, percussionMap=percussionMap)
         self.codec.encodeAll(self.dataset)
-        self.metadata = SequenceVAEMetaData(self.codec.maxNote-self.codec.minNote, ticksPerQuarter*quartersPerMeasure*measuresPerSequence)
+        type = DECODER_TYPE_SEQ if percussionMap is None else DECODER_TYPE_PERC
+        self.metadata = SequenceVAEMetaData(self.codec.maxNote-self.codec.minNote, ticksPerQuarter*quartersPerMeasure*measuresPerSequence, type=type)
 
 
     def createModel(self, latentDim = 3, hiddenLayers = 2):
@@ -95,6 +101,7 @@ class SequenceVAETrainer:
     
 
     def plotLatentSpace(self, dimensions = 3):
+        """ Plots a point for each sequence in the dataset in the latent space """
         if self.model is None:
             raise Exception('Model not set')
         latentdata = self.model.encode(self.dataset.getDataset())
@@ -120,7 +127,7 @@ class SequenceVAETrainer:
             plt.show()
 
 
-    def plotSequence(self, index, threshold = 0.5):
+    def plotInputOutputSequence(self, index, threshold = 0.5):
         if self.model is None:
             raise Exception('Model not set')
         insequence = self.dataset.getDataset()[index:index+1]
@@ -129,3 +136,10 @@ class SequenceVAETrainer:
         plotSparseNoteSequence(self.codec.decode(outsequence)[0], threshold = threshold)
 
 
+    def plotOutputValueDistribution(self):
+        if self.model is None:
+            raise Exception('Model not set')
+        output = self.model.predict(self.dataset.getDataset())
+        plt.hist(output.flatten(), bins=100)
+        plt.ylim(0, 5000)
+        plt.show()

@@ -2,6 +2,7 @@ from music21 import converter, pitch, interval, instrument, note, stream, meter
 from music21.stream.base import Score
 from enum import Enum
 from xen.utils import isInteger
+from typing import List
 import glob
 import numpy as np
 import fractions
@@ -94,16 +95,14 @@ class SongDataSet:
 
 
     @classmethod
-    def fromMidiDir(cls, path, recursive = False):
+    def fromMidiPaths(cls, paths:List[str], recursve = False):
         dataset = cls()
-        dataset.loadMidiDir(path, recursive)
-        return dataset
-    
-
-    @classmethod
-    def fromMidiFiles(cls, files):
-        dataset = cls()
-        dataset.loadMidiFiles(files)
+        for path in paths:
+            # if path is file
+            if path.endswith('.mid'):
+                dataset.loadMidiFiles([path])
+            else:
+                dataset.loadMidiDir(path, recursve)
         return dataset
 
 

@@ -1,5 +1,6 @@
 from .NoteSequenceSparseCodec import NoteSequenceSparseCodec
 from xen.data.SongData import SongData, SongDataSet
+from typing import Callable
 import numpy as np
 
 
@@ -34,8 +35,8 @@ class NoteSequenceFlatCodec(NoteSequenceSparseCodec):
     Compresses the resulting array by removing all data points that are never used.
     """
     def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', 
-                 trim:bool=True, compress:bool=False, normaliseOctave:bool=True):
-        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature, normaliseOctave=normaliseOctave)
+                 trim:bool=True, compress:bool=False, normaliseOctave:bool=True, percussionMap:None|Callable[[int], int]=None):
+        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature, normaliseOctave=normaliseOctave, percussionMap=percussionMap)
         self.encodedShape = (ticksPerQuarter*measuresPerSequence*quartersPerMeasure*NUM_NOTES,)
         self.compress = compress
         self.trim = trim

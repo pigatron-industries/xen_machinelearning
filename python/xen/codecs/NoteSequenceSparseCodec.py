@@ -40,6 +40,7 @@ class NoteSequenceSparseCodec(Codec):
             except Exception as e:
                 raise Exception(f'File: {song.filePath}')
         dataset.sequences = sequences
+        print(f"Encoded {len(sequences)} sequences")
         return sequences
 
     def makeSequences(self, song: SongData):

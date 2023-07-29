@@ -18,10 +18,11 @@ class NoteSequenceSparseCodec(Codec):
     timeSignature: string representing the time signature of the score, used to make sure consecutive measures are all the same time signature
     measuresPerSequence: number of measures to include in each sequence, if None then the whole score is used
     """
-    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int|None=1, timesignature:str='4/4', trim:bool=True, normaliseOctave:bool=True, 
-                 percussionMap:None|Callable[[int], int]=None):
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int|None=1, timesignature:str='4/4', minMeasuresPerSequence:int=0,
+                 trim:bool=True, normaliseOctave:bool=True, percussionMap:None|Callable[[int], int]=None):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
+        self.minMeasuresPerSequence = minMeasuresPerSequence
         self.quartersPerMeasure = quartersPerMeasure
         self.timesignature = timesignature
         self.trim = trim
@@ -96,22 +97,29 @@ class NoteSequenceSparseCodec(Codec):
 
 
     def makeSequencesFromSong(self, song: SongData) -> List[np.ndarray]:
-        sequences:List[np.ndarray] = []  #sequences = np.empty((0,)+self.sequenceShape)
+        print(f'Encoding {song.filePath}')
+        sequences:List[np.ndarray] = []
         ignoredSequences = 0
-        for part in song.getParts():
+        parts = song.getParts()
+        # if(len(parts) > 1):
+        #     print(f'Warning: {song.filePath} has {len(parts)} parts')
+        for part in parts:
             measuresList = song.getConsecutiveMeasures(part, self.measuresPerSequence, self.timesignature)
             for measures in measuresList:
+                if(len(measures) < self.minMeasuresPerSequence):
+                    ignoredSequences += 1
+                    continue
                 try:
                     sequence = np.empty((0, NUM_NOTES))
                     for measure in measures:
                         measureSeq = self.makeSequenceFromMeasure(measure)
                         sequence = np.append(sequence, measureSeq, 0)
                     sequences.append(sequence)
-                    # sequences = np.append(sequences, [sequence], 0)
                 except ValueError as e:
                     ignoredSequences += 1
-        if(ignoredSequences > 0):
-            print(f'Ignored {ignoredSequences} sequences from {song.filePath}')
+            if(ignoredSequences > 0):
+                print(f'Ignored {ignoredSequences} sequences from {song.filePath}')
+        print(f'Encoded {len(sequences)} sequences from {song.filePath}')
         return sequences
 
     def makeSequenceFromMeasure(self, measure: Measure):
@@ -123,7 +131,10 @@ class NoteSequenceSparseCodec(Codec):
         else:
             transpose = 0
             
-        for element in measure.recurse().notes:
+        elements = measure.recurse().notes
+        if(len(elements) == 0):
+            print(f'Warning: measure {measure.number} has no notes')
+        for element in elements:
             offset = element.offset * self.ticksPerQuarter
             if element.isNote:
                 self.addNoteToSequence(sequence, element.pitch.midi, offset, transpose)

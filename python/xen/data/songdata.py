@@ -70,15 +70,34 @@ class SongData:
             notes = measure.recurse().notes
             if(measure.timeSignature != None):
                 currentTimeSig = measure.timeSignature
-            if(currentTimeSig.ratioString == match_timesig and len(notes) > 0):
-                consecutiveMeasures.append(measure)
-                if(len(consecutiveMeasures) == measuresPerSequence):
+            
+            if(len(notes) > 0):
+                if(measuresPerSequence is not None and currentTimeSig.ratioString == match_timesig):
+                    consecutiveMeasures.append(measure)
+                    if(len(consecutiveMeasures) == measuresPerSequence):
+                        consecutiveMeasuresList.append(consecutiveMeasures)
+                        consecutiveMeasures = []
+                elif(measuresPerSequence is None):
+                    consecutiveMeasures.append(measure)
+                else:
+                    consecutiveMeasures = []
+
+            if(len(notes) == 0):
+                if(measuresPerSequence is None and len(consecutiveMeasures) > 0):
                     consecutiveMeasuresList.append(consecutiveMeasures)
                     consecutiveMeasures = []
-            else:
-                consecutiveMeasures = []
+
             i += 1
+            
+        # if no sequence length then append everything
+        if(measuresPerSequence is None and len(consecutiveMeasures) > 0):
+            consecutiveMeasuresList.append(consecutiveMeasures)
         return consecutiveMeasuresList
+    
+
+    def getAllMeasures(self, part):
+        return part.getElementsByClass(stream.Measure)
+
 
     def getOverlappingMeasures(self, part, measuresPerSequence, match_timesig):
         pass 

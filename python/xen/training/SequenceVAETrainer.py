@@ -41,16 +41,17 @@ class SequenceVAETrainer:
     def loadSongDataset(self, paths:List[str], recursive:bool = False, timesig = '4/4', ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
                         percussionMap:None|Callable[[int], int] = None):
         self.dataset = SongDataSet.fromMidiPaths(paths, recursive).filterTimeSig(timesig)
-        self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesig, trim = True, compress=False, normaliseOctave=True, percussionMap=percussionMap)
+        self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesig, trim = True, normaliseOctave=True, percussionMap=percussionMap)
         self.codec.encodeAll(self.dataset)
         type = DECODER_TYPE_SEQ if percussionMap is None else DECODER_TYPE_PERC
-        self.metadata = SequenceVAEMetaData(self.codec.maxNote-self.codec.minNote, ticksPerQuarter*quartersPerMeasure*measuresPerSequence, type=type)
+        self.metadata = SequenceVAEMetaData(self.codec.maxNote-self.codec.minNote+1, ticksPerQuarter*quartersPerMeasure*measuresPerSequence, type=type)
 
 
     def createModel(self, latentDim = 3, hiddenLayers = 2):
         # calculate layer dimensions as a reduction by equal factor
-        inputDim = self.dataset.getDataset().shape[1]
-        dimDivider = (self.dataset.getDataset().shape[1] // latentDim) ** (1./(hiddenLayers + 1))
+        inputDim = self.dataset.getDataset()[0].shape[0]
+        # inputDim = self.dataset.getDataset().shape[1]
+        dimDivider = (inputDim // latentDim) ** (1./(hiddenLayers + 1))
         layerDims = [inputDim]
         for i in range(hiddenLayers):
             layerDims.append(int(layerDims[-1] / dimDivider))
@@ -64,11 +65,15 @@ class SequenceVAETrainer:
         self.model = VariationalAutoEncoder.from_pretrained(name=self.modelName, path=self.modelPath)
 
 
+    def getTrainData(self):
+        return np.array(self.dataset.getDataset())
+
+
     def train(self, batchSize = 32, epochs = 500, learning_rate = 0.005):
         if self.model is None:
             raise Exception('Model not set')
         self.model.compile(optimizer=Adam(learning_rate=learning_rate))
-        self.model.train(self.dataset.getDataset(), batchSize = batchSize, epochs = epochs)
+        self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs)
 
 
     def saveModel(self, quantize = None):
@@ -80,7 +85,7 @@ class SequenceVAETrainer:
     def calcRecall(self):
         if self.model is None:
             raise Exception('Model not set')
-        output = self.model.predict(self.dataset.getDataset())
+        output = self.model.predict(self.getTrainData())
         matches = self._countMatches(self.dataset.getDataset(), output)
         print(f'{matches/len(self.dataset.getDataset())*100}% recall')
 
@@ -104,7 +109,7 @@ class SequenceVAETrainer:
         """ Plots a point for each sequence in the dataset in the latent space """
         if self.model is None:
             raise Exception('Model not set')
-        latentdata = self.model.encode(self.dataset.getDataset())
+        latentdata = self.model.encode(self.getTrainData())
         sampling = np.array(latentdata[0])
         print(sampling[:,0])
 
@@ -130,16 +135,22 @@ class SequenceVAETrainer:
     def plotInputOutputSequence(self, index, threshold = 0.5):
         if self.model is None:
             raise Exception('Model not set')
-        insequence = self.dataset.getDataset()[index:index+1]
+        insequence = self.getTrainData()[index:index+1]
         outsequence = self.model.predict(insequence)
-        plotSparseNoteSequence(self.codec.decode(insequence)[0], threshold = threshold)
-        plotSparseNoteSequence(self.codec.decode(outsequence)[0], threshold = threshold)
+
+        print(insequence.shape)
+        print(self.codec.decode([insequence])[0].shape)
+
+        plotSparseNoteSequence(self.codec.decode([insequence])[0], threshold = threshold)
+        plotSparseNoteSequence(self.codec.decode([outsequence])[0], threshold = threshold)
+        latent = self.model.encode([insequence])[0]
+        print(latent)
 
 
     def plotOutputValueDistribution(self):
         if self.model is None:
             raise Exception('Model not set')
-        output = self.model.predict(self.dataset.getDataset())
+        output = self.model.predict(self.getTrainData())
         plt.hist(output.flatten(), bins=100)
         plt.ylim(0, 5000)
         plt.show()

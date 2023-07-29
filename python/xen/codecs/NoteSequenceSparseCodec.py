@@ -3,7 +3,7 @@ from music21 import stream
 from music21.stream.base import Score, Part, Measure
 from xen.data.SongData import SongData, SongDataSet
 from xen.utils import isInteger
-from typing import Callable
+from typing import Callable, List
 import numpy as np
 
 
@@ -16,14 +16,19 @@ class NoteSequenceSparseCodec(Codec):
     Dimension 1 = time, measured in ticks
     Dimension 2 = pitch, where each note on event will be represented by a number 1 
     timeSignature: string representing the time signature of the score, used to make sure consecutive measures are all the same time signature
+    measuresPerSequence: number of measures to include in each sequence, if None then the whole score is used
     """
-    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', normaliseOctave:bool=True, 
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int|None=1, timesignature:str='4/4', trim:bool=True, normaliseOctave:bool=True, 
                  percussionMap:None|Callable[[int], int]=None):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
         self.quartersPerMeasure = quartersPerMeasure
         self.timesignature = timesignature
-        self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
+        self.trim = trim
+        if(measuresPerSequence is not None):
+            self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
+        else:
+            self.sequenceShape = None
         self.encodedShape = self.sequenceShape
         self.percussionMap = percussionMap
         if(self.percussionMap is None):
@@ -31,19 +36,56 @@ class NoteSequenceSparseCodec(Codec):
         else:
             self.normaliseOctave = normaliseOctave
 
-    def encodeAll(self, dataset: SongDataSet):
-        sequences = np.empty((0,)+self.sequenceShape)
+
+    def initTrimData(self, sequences):
+        """
+        Find lowest and highest notes in all sequences
+        """
+        self.minNote = NUM_NOTES-1
+        self.maxNote = 0
+        for sequence in sequences:
+            sequence = np.swapaxes(sequence, 0, 1)
+            for i, note in enumerate(sequence):
+                if(np.any(note)):
+                    if(i < self.minNote):
+                        self.minNote = i
+                    if(i > self.maxNote):
+                        self.maxNote = i
+        if(self.measuresPerSequence is not None):
+            self.encodedShape = (self.ticksPerQuarter * self.measuresPerSequence * self.quartersPerMeasure * (self.maxNote-self.minNote+1),)
+        print(f'Lowest note: {self.minNote}, Highest note: {self.maxNote}')
+
+
+    def trimSequences(self, sequences:List[np.ndarray]):
+        trimmedSequences = []
+        for sequence in sequences:
+            sequence = np.swapaxes(sequence, 0, 1)
+            sequence = sequence[self.minNote:self.maxNote+1]
+            sequence = np.swapaxes(sequence, 0, 1)
+            trimmedSequences.append(sequence)
+        return trimmedSequences
+
+
+    def encodeAll(self, dataset: SongDataSet) -> List[np.ndarray]:
+        sequences:List[np.ndarray] = [] #np.empty((0,)+self.sequenceShape)
         for song in dataset.songs:
             try:
-                self.makeSequences(song)
-                sequences = np.append(sequences, song.sequences, 0)
+                songSequences = self.encodeSparse(song)
+                sequences.extend(songSequences)
+                # sequences = np.append(sequences, song.sequences, 0)
             except Exception as e:
                 raise Exception(f'File: {song.filePath}')
+        print(f'Sparse sequence shape: {sequences[0].shape}')
+        if(self.trim):
+            self.initTrimData(sequences)
+            sequences = self.trimSequences(sequences)
+            print(f'Trimmed sequences shape: {sequences[0].shape}')
         dataset.sequences = sequences
         print(f"Encoded {len(sequences)} sequences")
         return sequences
+    
 
-    def makeSequences(self, song: SongData):
+    def encodeSparse(self, song: SongData) -> List[np.ndarray]:
         """
         Split score into packets and create a sequence from each one
         data: SongData
@@ -53,8 +95,9 @@ class NoteSequenceSparseCodec(Codec):
         song.sequences = sequences
         return sequences
 
-    def makeSequencesFromSong(self, song: SongData) -> np.ndarray:
-        sequences = np.empty((0,)+self.sequenceShape)
+
+    def makeSequencesFromSong(self, song: SongData) -> List[np.ndarray]:
+        sequences:List[np.ndarray] = []  #sequences = np.empty((0,)+self.sequenceShape)
         ignoredSequences = 0
         for part in song.getParts():
             measuresList = song.getConsecutiveMeasures(part, self.measuresPerSequence, self.timesignature)
@@ -64,7 +107,8 @@ class NoteSequenceSparseCodec(Codec):
                     for measure in measures:
                         measureSeq = self.makeSequenceFromMeasure(measure)
                         sequence = np.append(sequence, measureSeq, 0)
-                    sequences = np.append(sequences, [sequence], 0)
+                    sequences.append(sequence)
+                    # sequences = np.append(sequences, [sequence], 0)
                 except ValueError as e:
                     ignoredSequences += 1
         if(ignoredSequences > 0):

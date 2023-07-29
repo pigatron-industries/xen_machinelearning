@@ -21,7 +21,7 @@ class SongData:
     def __init__(self, score:Score, filePath:str):
         self.score: Score = score
         self.filePath: str = filePath
-        self.sequences = None
+        self.sequences: List[np.ndarray] = []
         self.minPitch = None
         self.maxPitch = None
 
@@ -83,6 +83,7 @@ class SongData:
     def getOverlappingMeasures(self, part, measuresPerSequence, match_timesig):
         pass 
 
+
     
 class SongDataSet:
     def __init__(self, songs = None):
@@ -90,7 +91,8 @@ class SongDataSet:
             self.songs = songs
         else:
             self.songs = []
-        self.sequences:np.ndarray = np.array([])
+        # self.sequences:np.ndarray = np.array([])
+        self.sequences:List[np.ndarray] = []
         self.encodedSequences = None
 
 

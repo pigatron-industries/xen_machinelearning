@@ -67,12 +67,11 @@ class NoteSequenceSparseCodec(Codec):
 
 
     def encodeAll(self, dataset: SongDataSet) -> List[np.ndarray]:
-        sequences:List[np.ndarray] = [] #np.empty((0,)+self.sequenceShape)
+        sequences:List[np.ndarray] = []
         for song in dataset.songs:
             try:
                 songSequences = self.encodeSparse(song)
                 sequences.extend(songSequences)
-                # sequences = np.append(sequences, song.sequences, 0)
             except Exception as e:
                 raise Exception(f'File: {song.filePath}')
         print(f'Sparse sequence shape: {sequences[0].shape}')

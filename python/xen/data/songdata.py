@@ -97,14 +97,14 @@ class SongDataSet:
 
 
     @classmethod
-    def fromMidiPaths(cls, paths:List[str], recursve = False):
+    def fromMidiPaths(cls, paths:List[str], recursive = False):
         dataset = cls()
         for path in paths:
             # if path is file
             if path.endswith('.mid'):
                 dataset.loadMidiFiles([path])
             else:
-                dataset.loadMidiDir(path, recursve)
+                dataset.loadMidiDir(path, recursive)
         return dataset
 
 

@@ -18,7 +18,7 @@ class NoteSequenceSparseCodec(Codec):
     timeSignature: string representing the time signature of the score, used to make sure consecutive measures are all the same time signature
     measuresPerSequence: number of measures to include in each sequence, if None then the whole score is used
     """
-    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int|None=1, timesignature:str='4/4', minMeasuresPerSequence:int=0,
+    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int|None=4, measuresPerSequence:int|None=1, timesignature:str|None='4/4', minMeasuresPerSequence:int=0,
                  trim:bool=True, normaliseOctave:bool=True, percussionMap:None|Callable[[int], int]=None):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
@@ -26,7 +26,7 @@ class NoteSequenceSparseCodec(Codec):
         self.quartersPerMeasure = quartersPerMeasure
         self.timesignature = timesignature
         self.trim = trim
-        if(measuresPerSequence is not None):
+        if(measuresPerSequence is not None and quartersPerMeasure is not None):
             self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
         else:
             self.sequenceShape = None
@@ -52,7 +52,7 @@ class NoteSequenceSparseCodec(Codec):
                         self.minNote = i
                     if(i > self.maxNote):
                         self.maxNote = i
-        if(self.measuresPerSequence is not None):
+        if(self.measuresPerSequence is not None and self.quartersPerMeasure is not None):
             self.encodedShape = (self.ticksPerQuarter * self.measuresPerSequence * self.quartersPerMeasure * (self.maxNote-self.minNote+1),)
         print(f'Lowest note: {self.minNote}, Highest note: {self.maxNote}')
 

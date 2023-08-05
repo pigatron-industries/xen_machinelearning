@@ -1,10 +1,12 @@
-from music21 import stream, meter
+from music21.stream.base import Measure
 from matplotlib import pyplot as plt
+
+from xen.data.SongData import elementToMidiPitches
 
 
 def plotPart(part):
     print(part.partName)
-    measures = part.getElementsByClass(stream.Measure)
+    measures = part.getElementsByClass(Measure)
     plotMeasures(measures)
 
 
@@ -26,11 +28,9 @@ def plotMeasures(measures):
             plt.text(x = measure.offset, y=45, s=f'{measure.timeSignature.numerator}/{measure.timeSignature.denominator}')
 
         for element in measure.recurse().notes:
-            if element.isNote:
-                plt.plot([measure.offset+element.offset, measure.offset+element.offset+element.duration.quarterLength], [element.pitch.midi, element.pitch.midi], color='b', marker='.')
-            if element.isChord:
-                for note in element.notes:
-                    plt.plot([measure.offset+element.offset, measure.offset+element.offset+element.duration.quarterLength], [note.pitch.midi, note.pitch.midi], color='b', marker='.')
+            midipitches = elementToMidiPitches(element)
+            for midipitch in midipitches:
+                plt.plot([measure.offset+element.offset, measure.offset+element.offset+element.duration.quarterLength], [midipitch, midipitch], color='b', marker='.')
 
     plt.xlabel('Time (qtr notes)')
     plt.ylabel('Pitch (midi)')

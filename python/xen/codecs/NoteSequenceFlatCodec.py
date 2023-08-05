@@ -13,8 +13,8 @@ class NoteSequenceFlatCodec(NoteSequenceSparseCodec):
     Compresses the resulting array by removing all data points that are never used.
     """
     def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', 
-                 trim:bool=True, normaliseOctave:bool=True, percussionMap:None|Callable[[int], int]=None):
-        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature, normaliseOctave=normaliseOctave, percussionMap=percussionMap)
+                 instrumentFilter:List[str]|None = None, trim:bool=True, normaliseOctave:bool=True, percussionMap:None|Callable[[int], int]=None):
+        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature, instrumentFilter = instrumentFilter, normaliseOctave=normaliseOctave, percussionMap=percussionMap)
         self.encodedShape = (ticksPerQuarter*measuresPerSequence*quartersPerMeasure*NUM_NOTES,)
         self.trim = trim
         self.maxNote = NUM_NOTES-1

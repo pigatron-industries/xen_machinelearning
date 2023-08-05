@@ -25,7 +25,7 @@ class SequenceVAEMetaData(ModelMetadata):
 class SequenceVAETrainer:
     def __init__(self, modelName, modelPath="../models"):
         self.model:VariationalAutoEncoder|None = None
-        self.dataset:SongDataSet = SongDataSet()
+        self.dataset:SongDataSet = SongDataSet([])
         self.modelPath = modelPath
         self.modelName = modelName
 
@@ -39,9 +39,9 @@ class SequenceVAETrainer:
 
 
     def loadSongDataset(self, paths:List[str], recursive:bool = False, timesig = '4/4', ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
-                        percussionMap:None|Callable[[int], int] = None):
+                        instrumentFilter:List[str]|None = None, percussionMap:Callable[[int], int]|None = None):
         self.dataset = SongDataSet.fromMidiPaths(paths, recursive).filterTimeSig(timesig)
-        self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesig, trim = True, normaliseOctave=True, percussionMap=percussionMap)
+        self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature=timesig, instrumentFilter=instrumentFilter, trim = True, normaliseOctave=True, percussionMap=percussionMap)
         self.codec.encodeAll(self.dataset)
         type = DECODER_TYPE_SEQ if percussionMap is None else DECODER_TYPE_PERC
         self.metadata = SequenceVAEMetaData(self.codec.maxNote-self.codec.minNote+1, ticksPerQuarter*quartersPerMeasure*measuresPerSequence, type=type)

@@ -1,7 +1,6 @@
 from .Codec import Codec
-from music21 import stream
 from music21.stream.base import Score, Part, Measure
-from xen.data.SongData import SongData, SongDataSet
+from xen.data.SongData import SongData, SongDataSet, elementToMidiPitches
 from xen.utils import isInteger
 from typing import Callable, List
 import numpy as np
@@ -19,12 +18,13 @@ class NoteSequenceSparseCodec(Codec):
     measuresPerSequence: number of measures to include in each sequence, if None then the whole score is used
     """
     def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int|None=4, measuresPerSequence:int|None=1, timesignature:str|None='4/4', minMeasuresPerSequence:int=0,
-                 trim:bool=True, normaliseOctave:bool=True, percussionMap:None|Callable[[int], int]=None):
+                 instrumentFilter:List[str]|None = None, trim:bool=True, normaliseOctave:bool=True, percussionMap:Callable[[int], int]|None=None):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
         self.minMeasuresPerSequence = minMeasuresPerSequence
         self.quartersPerMeasure = quartersPerMeasure
         self.timesignature = timesignature
+        self.instrumentFilter = instrumentFilter
         self.trim = trim
         if(measuresPerSequence is not None and quartersPerMeasure is not None):
             self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
@@ -100,7 +100,10 @@ class NoteSequenceSparseCodec(Codec):
         print(f'Encoding {song.filePath}')
         sequences:List[np.ndarray] = []
         ignoredSequences = 0
-        parts = song.getParts()
+        if(self.instrumentFilter is not None):
+            parts = song.getPartsByInstruments(self.instrumentFilter)
+        else:
+            parts = song.getParts()
         # if(len(parts) > 1):
         #     print(f'Warning: {song.filePath} has {len(parts)} parts')
         for part in parts:
@@ -130,17 +133,14 @@ class NoteSequenceSparseCodec(Codec):
             transpose = lowestOctave * 12
         else:
             transpose = 0
-            
+
         elements = measure.recurse().notes
         if(len(elements) == 0):
             print(f'Warning: measure {measure.number} has no notes')
         for element in elements:
             offset = element.offset * self.ticksPerQuarter
-            if element.isNote:
-                self.addNoteToSequence(sequence, element.pitch.midi, offset, transpose)
-            if element.isChord:
-                for note in element.notes:
-                    self.addNoteToSequence(sequence, note.pitch.midi, offset, transpose)
+            for midinote in elementToMidiPitches(element):
+                self.addNoteToSequence(sequence, midinote, offset, transpose)
         return sequence
     
 
@@ -154,7 +154,7 @@ class NoteSequenceSparseCodec(Codec):
         sequence[int(offset)][midinote] = 1
 
     
-    def getLowestNote(self, measure: stream.Measure):
+    def getLowestNote(self, measure: Measure):
         lowestNote = 128
         for element in measure.recurse().notes:
             if element.isNote:

@@ -1,5 +1,9 @@
-from music21 import converter, pitch, interval, instrument, note, stream, meter
-from music21.stream.base import Score
+from music21 import converter
+from music21.stream.base import Score, Part, Measure
+from music21.percussion import PercussionChord
+from music21.note import Note, Unpitched, NotRest
+from music21.chord import Chord
+from music21.meter.base import TimeSignature
 from enum import Enum
 from xen.utils import isInteger
 from typing import List
@@ -35,10 +39,10 @@ class SongData:
             raise Exception(f'score not instance of Score: {filePath}')
 
     def getParts(self):
-        return self.score.getElementsByClass(stream.Part)
+        return self.score.getElementsByClass(Part)
     
 
-    def getPartsByInstruments(self, matchInstrumentNames:List[str]):
+    def getPartsByInstruments(self, matchInstrumentNames:List[str]) -> List[Part]:
         parts = []
         for part in self.getParts():
             instruments = part.getInstruments()
@@ -51,7 +55,7 @@ class SongData:
     
 
     def getTimeSigs(self):
-        return self.score.recurse().getElementsByClass(meter.TimeSignature)
+        return self.score.recurse().getElementsByClass(TimeSignature)
 
     def hasTimeSig(self, match_timesig):
         for timesig in self.getTimeSigs():
@@ -76,7 +80,7 @@ class SongData:
     def getConsecutiveMeasures(self, part, measuresPerSequence, match_timesig):
         consecutiveMeasuresList = []
         consecutiveMeasures = []
-        measures = part.getElementsByClass(stream.Measure)
+        measures = part.getElementsByClass(Measure)
         currentTimeSig = None
         i = 0
         while i < len(measures):
@@ -110,7 +114,7 @@ class SongData:
     
 
     def getAllMeasures(self, part):
-        return part.getElementsByClass(stream.Measure)
+        return part.getElementsByClass(Measure)
 
 
     def getOverlappingMeasures(self, part, measuresPerSequence, match_timesig):
@@ -119,7 +123,7 @@ class SongData:
 
     
 class SongDataSet:
-    def __init__(self, songs = None):
+    def __init__(self, songs:List[SongData]):
         if songs is not None:
             self.songs = songs
         else:
@@ -131,7 +135,7 @@ class SongDataSet:
 
     @classmethod
     def fromMidiPaths(cls, paths:List[str], recursive = False):
-        dataset = cls()
+        dataset = cls([])
         for path in paths:
             # if path is file
             if path.endswith('.mid'):
@@ -205,3 +209,21 @@ class SongDataSet:
                 timesigsdict[timsiglabel].songs.append(song)
         return timesigsdict
  
+
+def elementToMidiPitches(element:NotRest) -> List[int]:
+    if isinstance(element, Note):
+        return [element.pitch.midi]
+    if isinstance(element, Unpitched):
+        if(element.getInstrument().percMapPitch is not None):
+            return [element.getInstrument().percMapPitch]
+        else:
+            return []
+    if isinstance(element, Chord):
+        return [noteelem.pitch.midi for noteelem in element.notes]
+    if isinstance(element, PercussionChord):
+        midipitches = []
+        for noteelem in element.notes:
+            if noteelem.getInstrument().percMapPitch is not None:
+                midipitches.append(noteelem.getInstrument().percMapPitch)
+        return midipitches
+    raise ValueError(f'Unknown element type: {type(element)}')

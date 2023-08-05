@@ -205,9 +205,23 @@ class SongDataSet:
             for timesig in timesigs:
                 timsiglabel = f'{timesig.numerator}/{timesig.denominator}'
                 if timsiglabel not in timesigsdict:
-                    timesigsdict[timsiglabel] = SongDataSet()
+                    timesigsdict[timsiglabel] = SongDataSet([])
                 timesigsdict[timsiglabel].songs.append(song)
         return timesigsdict
+    
+
+    def dedupeSequences(self):
+        uniquesequences = []
+        for sequence in self.sequences:
+            found = False
+            for uniquesequence in uniquesequences:
+                if np.array_equal(sequence, uniquesequence):
+                    found = True
+                    break
+            if not found:
+                uniquesequences.append(sequence)
+        self.sequences = uniquesequences
+        print(f'Deduped to {len(self.sequences)} sequences')
  
 
 def elementToMidiPitches(element:NotRest) -> List[int]:

@@ -3,6 +3,7 @@ from xen.codecs.NoteSequenceFlatCodec import NoteSequenceFlatCodec
 from xen.models.VariationalAutoencoder import VariationalAutoEncoder
 from xen.models.AbstractModel import ModelMetadata
 from xen.visualise import plotSparseNoteSequence
+from .ModelTrainer import ModelTrainer
 
 import numpy as np
 import tensorflow as tf
@@ -22,20 +23,15 @@ class SequenceVAEMetaData(ModelMetadata):
         super().__init__(type, [notesPerTick, ticksPerSequence])
 
 
-class SequenceVAETrainer:
+class SequenceVAETrainer(ModelTrainer):
     def __init__(self, modelName, modelPath="../models"):
+        super().__init__(modelName, modelPath)
         self.model:VariationalAutoEncoder|None = None
         self.dataset:SongDataSet = SongDataSet([])
-        self.modelPath = modelPath
-        self.modelName = modelName
 
 
     def setModel(self, model):
         self.model = model
-
-
-    def setDataset(self, dataset):
-        self.dataset = dataset
 
 
     def loadSongDataset(self, paths:List[str], recursive:bool = False, timesig = '4/4', ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
@@ -45,6 +41,13 @@ class SequenceVAETrainer:
         self.codec.encodeAll(self.dataset)
         type = DECODER_TYPE_SEQ if percussionMap is None else DECODER_TYPE_PERC
         self.metadata = SequenceVAEMetaData(self.codec.maxNote-self.codec.minNote+1, ticksPerQuarter*quartersPerMeasure*measuresPerSequence, type=type)
+        self.datasetInfo['paths'] = paths
+        self.datasetInfo['recursive'] = recursive
+        self.datasetInfo['timesig'] = timesig
+        self.datasetInfo['ticksPerQuarter'] = ticksPerQuarter
+        self.datasetInfo['quartersPerMeasure'] = quartersPerMeasure
+        self.datasetInfo['measuresPerSequence'] = measuresPerSequence
+        self.datasetInfo['instrumentFilter'] = instrumentFilter
 
 
     def createModel(self, latentDim = 3, hiddenLayers = 2):
@@ -59,6 +62,8 @@ class SequenceVAETrainer:
         print(f'Layer dims: {layerDims}')
         self.model = VariationalAutoEncoder.from_new(layerDims=layerDims, name=self.modelName, path=self.modelPath)
         self.model.compile(optimizer=Adam(learning_rate=0.005))
+        self.modelInfo['latentDim'] = latentDim
+        self.modelInfo['hiddenLayers'] = hiddenLayers
 
 
     def loadModel(self):
@@ -69,17 +74,19 @@ class SequenceVAETrainer:
         return np.array(self.dataset.getDataset())
 
 
-    def train(self, batchSize = 32, epochs = 500, learning_rate = 0.005):
+    def train(self, batchSize = 32, epochs = 500, learningRate = 0.005):
         if self.model is None:
             raise Exception('Model not set')
-        self.model.compile(optimizer=Adam(learning_rate=learning_rate))
-        self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs)
+        self.model.compile(optimizer=Adam(learning_rate=learningRate))
+        history = self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs)
+        self.addTrainingInfo(batchSize, epochs, learningRate, history)
 
 
     def saveModel(self, quantize = None):
         if self.model is None:
             raise Exception('Model not set')
         self.model.save(quantize=quantize, metadata = self.metadata)
+        self.saveModelInfo()
 
 
     def calcRecall(self):

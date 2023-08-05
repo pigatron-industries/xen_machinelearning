@@ -86,8 +86,9 @@ class VariationalAutoEncoder(AbstractModel):
         self.vaeModel.compile(optimizer=optimizer, loss=self.vaeLoss)
 
 
-    def train(self, traindata, epochs, batchSize = 32):
-        self.vaeModel.fit(traindata, traindata, epochs = epochs, batch_size=batchSize) 
+    def train(self, traindata, epochs, batchSize = 32, callbacks = None):
+        self.vaeModel.fit(traindata, traindata, epochs = epochs, batch_size=batchSize, callbacks=callbacks) 
+        return self.vaeModel.history.history
 
 
     def encode(self, inputdata):

@@ -4,6 +4,7 @@ from enum import Enum
 from xen.utils import isInteger
 from typing import List
 import glob
+import re
 import numpy as np
 import fractions
 import numpy as np
@@ -35,6 +36,19 @@ class SongData:
 
     def getParts(self):
         return self.score.getElementsByClass(stream.Part)
+    
+
+    def getPartsByInstruments(self, matchInstrumentNames:List[str]):
+        parts = []
+        for part in self.getParts():
+            instruments = part.getInstruments()
+            for instrument in instruments:
+                for matchInstrumentName in matchInstrumentNames:
+                    if(re.search(matchInstrumentName, instrument.instrumentName) or
+                       re.search(matchInstrumentName, part.partName)):
+                        parts.append(part)
+        return parts
+    
 
     def getTimeSigs(self):
         return self.score.recurse().getElementsByClass(meter.TimeSignature)

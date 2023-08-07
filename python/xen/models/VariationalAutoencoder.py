@@ -77,6 +77,7 @@ class VariationalAutoEncoder(AbstractModel):
 
     
     def vaeLoss(self, inputLayer, outputLayer):
+        # reconstructionLoss = metrics.mean_squared_error(inputLayer, outputLayer)
         reconstructionLoss = metrics.binary_crossentropy(inputLayer, outputLayer) * self.inputDim
         klLoss = -0.5 * K.sum(1 + self.logVarLayer - K.square(self.meanLayer) - K.exp(self.logVarLayer), axis=-1)
         return K.mean(reconstructionLoss + klLoss)

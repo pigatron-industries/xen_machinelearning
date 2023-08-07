@@ -8,6 +8,7 @@ from .ModelTrainer import ModelTrainer
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.optimizers.legacy import Adam
+from keras.callbacks import ReduceLROnPlateau, EarlyStopping
 from typing import List, Callable
 
 from matplotlib import pyplot as plt
@@ -74,12 +75,15 @@ class SequenceVAETrainer(ModelTrainer):
         return np.array(self.dataset.getDataset())
 
 
-    def train(self, batchSize = 32, epochs = 500, learningRate = 0.005):
+    def train(self, batchSize = 32, epochs = 500, learningRate = 0.005, minLearningRate = 1e-8, factor=0.5, patience=100):
         if self.model is None:
             raise Exception('Model not set')
         self.model.compile(optimizer=Adam(learning_rate=learningRate))
+        # early_stopping = EarlyStopping(monitor='loss', patience=500, restore_best_weights=True)
+        # reduce_lr = ReduceLROnPlateau(monitor='loss', factor=factor, patience=patience, min_lr=minLearningRate)
+        # history = self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs, callbacks=[early_stopping, reduce_lr])
         history = self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs)
-        self.addTrainingInfo(batchSize, epochs, learningRate, history)
+        self.addTrainingInfo(batchSize, epochs, learningRate, minLearningRate, factor, patience, history)
 
 
     def saveModel(self, quantize = None):
@@ -161,3 +165,5 @@ class SequenceVAETrainer(ModelTrainer):
         plt.hist(output.flatten(), bins=100)
         plt.ylim(0, 5000)
         plt.show()
+
+

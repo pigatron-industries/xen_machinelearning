@@ -32,7 +32,7 @@ class NoteSequenceSparseCodec(Codec):
             self.sequenceShape = None
         self.encodedShape = self.sequenceShape
         self.percussionMap = percussionMap
-        if(self.percussionMap is None):
+        if(self.percussionMap is not None):
             self.normaliseOctave = False
         else:
             self.normaliseOctave = normaliseOctave
@@ -148,10 +148,17 @@ class NoteSequenceSparseCodec(Codec):
         if(not isInteger(offset)):
             raise ValueError(f'ERROR: note offset is not an integer: {offset}')
         if(self.percussionMap is not None):
-            midinote = self.percussionMap(midinote)
+            group = self.percussionMap(midinote)
+            if(isinstance(group, tuple)):
+                # print(sequence[0][0])
+                # tuple means instrument has an accent value
+                sequence[int(offset)][group[0]] = 1
+                sequence[int(offset)][group[0]+1] = group[1]
+            else:
+                sequence[int(offset)][group] = 1
         else:
             midinote = midinote - transpose
-        sequence[int(offset)][midinote] = 1
+            sequence[int(offset)][midinote] = 1
 
     
     def getLowestNote(self, measure: Measure):

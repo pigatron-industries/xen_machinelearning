@@ -12,11 +12,14 @@ class ModelTrainer:
     def setDataset(self, dataset):
         self.dataset = dataset
 
-    def addTrainingInfo(self, batchSize, epochs, learningRate, history):
+    def addTrainingInfo(self, batchSize, epochs, learningRate, minLearningRate, factor, patience, history):
         traininginfo = {}
         traininginfo['batchSize'] = batchSize
         traininginfo['epochs'] = epochs
         traininginfo['learningRate'] = learningRate
+        traininginfo['minLearningRate'] = minLearningRate
+        traininginfo['factor'] = factor
+        traininginfo['patience'] = patience
         traininginfo['loss'] = history['loss'][-1]
         self.trainingInfo.append(traininginfo)
 

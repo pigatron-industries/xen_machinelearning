@@ -33,13 +33,43 @@ VIBRA_SLAP          = 58
 RIDE_CYMBAL_2       = 59
 
 
+percussionMidiToName  =  {
+    ACCOUSTIC_BASS_DRUM: 'ACCOUSTIC_BASS_DRUM',
+    BASS_DRUM_1: 'BASS_DRUM_1',
+    SIDE_STICK: 'SIDE_STICK',
+    ACCOUSTIC_SNARE: 'ACCOUSTIC_SNARE',
+    HAND_CLAP: 'HAND_CLAP',
+    ELECTRIC_SNARE: 'ELECTRIC_SNARE',
+    LOW_FLOOR_TOM: 'LOW_FLOOR_TOM',
+    HIGH_FLOOR_TOM: 'HIGH_FLOOR_TOM',
+    LOW_TOM: 'LOW_TOM',
+    LOW_MID_TOM: 'LOW_MID_TOM',
+    HI_MID_TOM: 'HI_MID_TOM',
+    HIGH_TOM: 'HIGH_TOM',
+    CLOSED_HI_HAT: 'CLOSED_HI_HAT',
+    PEDAL_HI_HAT: 'PEDAL_HI_HAT',
+    OPEN_HI_HAT: 'OPEN_HI_HAT',
+    CRASH_CYMBAL_1: 'CRASH_CYMBAL_1',
+    RIDE_CYMBAL_1: 'RIDE_CYMBAL_1',
+    CHINESE_CYMBAL: 'CHINESE_CYMBAL',
+    RIDE_BELL: 'RIDE_BELL',
+    TAMBOURINE: 'TAMBOURINE',
+    SPLASH_CYMBAL: 'SPLASH_CYMBAL',
+    COWBELL: 'COWBELL',
+    CRASH_CYMBAL_2: 'CRASH_CYMBAL_2',
+    VIBRA_SLAP: 'VIBRA_SLAP',
+    RIDE_CYMBAL_2: 'RIDE_CYMBAL_2',
+}
+
+
 class PercussionMap:
     """A map of percussion instruments to MIDI note numbers."""
-    def __init__(self, map):
+    def __init__(self, map, groupSizes:list[int]):
         self.map = map
+        self.groupSizes = groupSizes
 
     def __call__(self, midi:int) -> int|Tuple[int, float]|None:
-        """Get the instrument group number for the given midi note number."""
+        """Get the instrument number for the given midi note number."""
         for group, instruments in self.map.items():
             for instrument in instruments:
                 if isinstance(instrument, tuple):
@@ -63,7 +93,7 @@ SimplePercussionMap = PercussionMap({
         4: [OPEN_HI_HAT],
         # cymbals
         5: [CRASH_CYMBAL_1, CHINESE_CYMBAL, RIDE_BELL, TAMBOURINE, SPLASH_CYMBAL, COWBELL, CRASH_CYMBAL_2, RIDE_CYMBAL_2],
-})
+}, [1, 1, 1, 2, 1])
 
 
 ExtendedPercussionMap = PercussionMap({
@@ -84,7 +114,7 @@ ExtendedPercussionMap = PercussionMap({
         # cymbals
         10: [RIDE_CYMBAL_1, RIDE_CYMBAL_2, RIDE_BELL, TAMBOURINE, COWBELL],
         11: [CRASH_CYMBAL_1, CRASH_CYMBAL_2, CHINESE_CYMBAL, SPLASH_CYMBAL],
-})
+}, [1, 1, 6, 2, 2])
 
 
 AccentedPercussionMap = PercussionMap({
@@ -98,4 +128,4 @@ AccentedPercussionMap = PercussionMap({
         6: [(CLOSED_HI_HAT, 0), (PEDAL_HI_HAT, 0), (OPEN_HI_HAT, 1)],
         # cymbals
         8: [(RIDE_CYMBAL_1, 0), (RIDE_CYMBAL_2, 0), (RIDE_BELL, 0), (TAMBOURINE, 0), (COWBELL, 0), (CRASH_CYMBAL_1, 1), (CRASH_CYMBAL_2, 1), (CHINESE_CYMBAL, 1), (SPLASH_CYMBAL, 1)]
-})
+}, [2, 2, 2, 2, 2])

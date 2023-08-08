@@ -1,4 +1,5 @@
 from xen.data.SongData import SongData, SongDataSet
+from xen.data.PercussionMap import PercussionMap
 from xen.codecs.NoteSequenceFlatCodec import NoteSequenceFlatCodec
 from xen.models.VariationalAutoencoder import VariationalAutoEncoder
 from xen.models.AbstractModel import ModelMetadata
@@ -13,15 +14,27 @@ from typing import List, Callable
 
 from matplotlib import pyplot as plt
 
-DECODER_TYPE_SEQ = "seqdec"
-DECODER_TYPE_PERC = "perdec"
+DECODER_TYPE_NOTE = "seqdec"
+DECODER_TYPE_PERCUSSION = "perdec"
 
 
 class SequenceVAEMetaData(ModelMetadata):
-    def __init__(self, notesPerTick, ticksPerSequence, type = "seqdec"):
+    def __init__(self, notesPerTick:int, ticksPerSequence:int, type:str):
+        self.type = type
         self.notesPerTick = notesPerTick
         self.ticksPerSequence = ticksPerSequence
-        super().__init__(type, [notesPerTick, ticksPerSequence])
+        metabytes = [notesPerTick, ticksPerSequence]
+        super().__init__(type, metabytes)
+
+class SequenceVAENoteMetaData(SequenceVAEMetaData):
+    def __init__(self, notesPerTick, ticksPerSequence):
+        super().__init__(notesPerTick, ticksPerSequence, DECODER_TYPE_NOTE)
+
+class SequenceVAEPercussionGroupedMetaData(SequenceVAEMetaData):
+    def __init__(self, notesPerTick, ticksPerSequence, groupSizes:List[int]):
+        self.groupSizes = groupSizes
+        super().__init__(notesPerTick, ticksPerSequence, DECODER_TYPE_PERCUSSION)
+        self.metabytes.extend([len(groupSizes)] + groupSizes)
 
 
 class SequenceVAETrainer(ModelTrainer):
@@ -36,12 +49,17 @@ class SequenceVAETrainer(ModelTrainer):
 
 
     def loadSongDataset(self, paths:List[str], recursive:bool = False, timesig = '4/4', ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
-                        instrumentFilter:List[str]|None = None, percussionMap:Callable[[int], int]|None = None):
+                        instrumentFilter:List[str]|None = None, percussionMap:PercussionMap|None = None):
         self.dataset = SongDataSet.fromMidiPaths(paths, recursive).filterTimeSig(timesig)
         self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature=timesig, instrumentFilter=instrumentFilter, trim = True, normaliseOctave=True, percussionMap=percussionMap)
         self.codec.encodeAll(self.dataset)
-        type = DECODER_TYPE_SEQ if percussionMap is None else DECODER_TYPE_PERC
-        self.metadata = SequenceVAEMetaData(self.codec.maxNote-self.codec.minNote+1, ticksPerQuarter*quartersPerMeasure*measuresPerSequence, type=type)
+        if(percussionMap is None):
+            self.metadata = SequenceVAENoteMetaData(self.codec.maxNote-self.codec.minNote+1, 
+                                                    ticksPerQuarter*quartersPerMeasure*measuresPerSequence)
+        else:
+            self.metadata = SequenceVAEPercussionGroupedMetaData(self.codec.maxNote-self.codec.minNote+1, 
+                                                                 ticksPerQuarter*quartersPerMeasure*measuresPerSequence, 
+                                                                 percussionMap.groupSizes)
         self.datasetInfo['paths'] = paths
         self.datasetInfo['recursive'] = recursive
         self.datasetInfo['timesig'] = timesig
@@ -75,14 +93,14 @@ class SequenceVAETrainer(ModelTrainer):
         return np.array(self.dataset.getDataset())
 
 
-    def train(self, batchSize = 32, epochs = 500, learningRate = 0.005, minLearningRate = 1e-8, factor=0.5, patience=100):
+    def train(self, batchSize = 32, epochs = 500, learningRate = 0.005, minLearningRate = 1e-6, factor=0.5, patience=100):
         if self.model is None:
             raise Exception('Model not set')
         self.model.compile(optimizer=Adam(learning_rate=learningRate))
-        # early_stopping = EarlyStopping(monitor='loss', patience=500, restore_best_weights=True)
-        # reduce_lr = ReduceLROnPlateau(monitor='loss', factor=factor, patience=patience, min_lr=minLearningRate)
-        # history = self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs, callbacks=[early_stopping, reduce_lr])
-        history = self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs)
+        early_stopping = EarlyStopping(monitor='loss', patience=500, restore_best_weights=True)
+        reduce_lr = ReduceLROnPlateau(monitor='loss', factor=factor, patience=patience, min_lr=minLearningRate)
+        history = self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs, callbacks=[early_stopping, reduce_lr])
+        # history = self.model.train(self.getTrainData(), batchSize = batchSize, epochs = epochs)
         self.addTrainingInfo(batchSize, epochs, learningRate, minLearningRate, factor, patience, history)
 
 

@@ -54,8 +54,8 @@ class VariationalAutoEncoder(AbstractModel):
         for i, dim in enumerate(self.internalDims):
             encoderInternalLayer = Dense(dim, activation='relu', name=f'encoder_internal_{i}')(internalInputLayer)
             internalInputLayer = encoderInternalLayer
-        self.meanLayer = Dense(self.latentDim, name='encoder_mean')(encoderInternalLayer)
-        self.logVarLayer = Dense(self.latentDim, name='encoder_logvar')(encoderInternalLayer)
+        self.meanLayer = Dense(self.latentDim, activation=self.scaledTanh, name='encoder_mean')(encoderInternalLayer)
+        self.logVarLayer = Dense(self.latentDim, activation=self.scaledTanh, name='encoder_logvar')(encoderInternalLayer)
         self.samplingLayer = Lambda(sampling, output_shape=(self.latentDim), name = 'encoder_sampling')([self.meanLayer, self.logVarLayer])
         self.encoderModel = Model(self.encoderInputLayer, [self.meanLayer, self.logVarLayer, self.samplingLayer], name='encoder')
         self.encoderModel.summary()
@@ -75,9 +75,13 @@ class VariationalAutoEncoder(AbstractModel):
         self.vaeModel = Model(self.encoderInputLayer, self.vaeOutputLayer, name='autoencoder')
         self.vaeModel.summary()
 
+
+    def scaledTanh(self, x):
+        return 3 * tf.keras.activations.tanh(x)
+    
     
     def vaeLoss(self, inputLayer, outputLayer):
-        # reconstructionLoss = metrics.mean_squared_error(inputLayer, outputLayer)
+        # reconstructionLoss = metrics.mean_squared_error(inputLayer, outputLayer) * self.inputDim
         reconstructionLoss = metrics.binary_crossentropy(inputLayer, outputLayer) * self.inputDim
         klLoss = -0.5 * K.sum(1 + self.logVarLayer - K.square(self.meanLayer) - K.exp(self.logVarLayer), axis=-1)
         return K.mean(reconstructionLoss + klLoss)

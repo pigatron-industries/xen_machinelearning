@@ -37,16 +37,17 @@ class VariationalAutoEncoder(AbstractModel):
 
 
     @classmethod
-    def from_new(cls, layerDims, path, name):
+    def from_new(cls, layerDims, path, name, latentScale = 3.0):
         model = cls(path = path, name = name)
-        model.create(layerDims=layerDims)
+        model.create(layerDims=layerDims, latentScale=latentScale)
         return model
 
 
-    def create(self, layerDims = [2048, 512, 128, 32]):
+    def create(self, layerDims = [2048, 512, 128, 32], latentScale = 3.0):
         self.inputDim = layerDims[0]
         self.internalDims = layerDims[1:-1]
         self.latentDim = layerDims[-1]
+        self.latentScale = latentScale
         # encoder model
         self.encoderInputLayer = Input(self.inputDim, name='encoder_input')
         encoderInternalLayer = self.encoderInputLayer
@@ -77,7 +78,7 @@ class VariationalAutoEncoder(AbstractModel):
 
 
     def scaledTanh(self, x):
-        return 3 * tf.keras.activations.tanh(x)
+        return self.latentScale * tf.keras.activations.tanh(x)
     
     
     def vaeLoss(self, inputLayer, outputLayer):

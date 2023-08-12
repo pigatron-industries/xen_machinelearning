@@ -23,12 +23,14 @@ class ModelTrainer:
         traininginfo['loss'] = history['loss'][-1]
         self.trainingInfo.append(traininginfo)
 
-    def saveModelInfo(self):
+    def saveModelInfo(self, metadata=None):
         info = {}
         info['name'] = self.modelName
         info['training'] = self.trainingInfo
         info['dataset'] = self.datasetInfo
         info['model'] = self.modelInfo
+        if metadata is not None:
+            info['metadata'] = vars(metadata)
         with open(f'{self.modelPath}/{self.modelName}.yml', 'w') as outfile:
             yaml.dump(info, outfile)
     

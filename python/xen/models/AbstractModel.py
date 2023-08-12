@@ -5,7 +5,8 @@ from tflite_support import metadata_schema_py_generated as _metadata_fb
 from tflite_support import flatbuffers
 
 
-class ModelMetadata:
+class ModelMetadata(dict):
+    """Metadata is the string 'xen:' followed by a 6 character type string and then a list of bytes."""
     def __init__(self, type = "", metabytes = []):
         self.metabytes = metabytes
         self.type = "xen:" + type

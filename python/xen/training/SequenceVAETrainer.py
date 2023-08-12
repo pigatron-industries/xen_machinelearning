@@ -19,21 +19,22 @@ DECODER_TYPE_PERCUSSION = "perdec"
 
 
 class SequenceVAEMetaData(ModelMetadata):
-    def __init__(self, notesPerTick:int, ticksPerSequence:int, type:str):
+    def __init__(self, type:str, notesPerTick:int, ticksPerSequence:int, latentScale:int):
         self.type = type
         self.notesPerTick = notesPerTick
         self.ticksPerSequence = ticksPerSequence
-        metabytes = [notesPerTick, ticksPerSequence]
+        self.latentScale = latentScale
+        metabytes = [notesPerTick, ticksPerSequence, latentScale]
         super().__init__(type, metabytes)
 
 class SequenceVAENoteMetaData(SequenceVAEMetaData):
-    def __init__(self, notesPerTick, ticksPerSequence):
-        super().__init__(notesPerTick, ticksPerSequence, DECODER_TYPE_NOTE)
+    def __init__(self, notesPerTick, ticksPerSequence, latentScale:int):
+        super().__init__(DECODER_TYPE_NOTE, notesPerTick, ticksPerSequence, latentScale)
 
 class SequenceVAEPercussionGroupedMetaData(SequenceVAEMetaData):
-    def __init__(self, notesPerTick, ticksPerSequence, groupSizes:List[int]):
+    def __init__(self, notesPerTick, ticksPerSequence, latentScale:int, groupSizes:List[int]):
         self.groupSizes = groupSizes
-        super().__init__(notesPerTick, ticksPerSequence, DECODER_TYPE_PERCUSSION)
+        super().__init__(DECODER_TYPE_PERCUSSION, notesPerTick, ticksPerSequence, latentScale)
         self.metabytes.extend([len(groupSizes)] + groupSizes)
 
 
@@ -54,12 +55,14 @@ class SequenceVAETrainer(ModelTrainer):
         self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature=timesig, instrumentFilter=instrumentFilter, trim = True, normaliseOctave=True, percussionMap=percussionMap)
         self.codec.encodeAll(self.dataset)
         if(percussionMap is None):
-            self.metadata = SequenceVAENoteMetaData(self.codec.maxNote-self.codec.minNote+1, 
-                                                    ticksPerQuarter*quartersPerMeasure*measuresPerSequence)
+            self.metadata = SequenceVAENoteMetaData(notesPerTick=self.codec.maxNote-self.codec.minNote+1, 
+                                                    ticksPerSequence=ticksPerQuarter*quartersPerMeasure*measuresPerSequence, 
+                                                    latentScale=3)
         else:
-            self.metadata = SequenceVAEPercussionGroupedMetaData(self.codec.maxNote-self.codec.minNote+1, 
-                                                                 ticksPerQuarter*quartersPerMeasure*measuresPerSequence, 
-                                                                 percussionMap.groupSizes)
+            self.metadata = SequenceVAEPercussionGroupedMetaData(notesPerTick=self.codec.maxNote-self.codec.minNote+1, 
+                                                                 ticksPerSequence=ticksPerQuarter*quartersPerMeasure*measuresPerSequence, 
+                                                                 groupSizes=percussionMap.groupSizes,
+                                                                 latentScale=3)
         self.datasetInfo['paths'] = paths
         self.datasetInfo['recursive'] = recursive
         self.datasetInfo['timesig'] = timesig
@@ -69,7 +72,7 @@ class SequenceVAETrainer(ModelTrainer):
         self.datasetInfo['instrumentFilter'] = instrumentFilter
 
 
-    def createModel(self, latentDim = 3, hiddenLayers = 2):
+    def createModel(self, latentDim = 3, hiddenLayers = 2, latentScale:float = 3.0):
         # calculate layer dimensions as a reduction by equal factor
         inputDim = self.dataset.getDataset()[0].shape[0]
         # inputDim = self.dataset.getDataset().shape[1]
@@ -79,10 +82,12 @@ class SequenceVAETrainer(ModelTrainer):
             layerDims.append(int(layerDims[-1] / dimDivider))
         layerDims.append(latentDim)
         print(f'Layer dims: {layerDims}')
-        self.model = VariationalAutoEncoder.from_new(layerDims=layerDims, name=self.modelName, path=self.modelPath)
+        self.model = VariationalAutoEncoder.from_new(layerDims=layerDims, name=self.modelName, path=self.modelPath, latentScale=latentScale)
         self.model.compile(optimizer=Adam(learning_rate=0.005))
         self.modelInfo['latentDim'] = latentDim
         self.modelInfo['hiddenLayers'] = hiddenLayers
+        self.modelInfo['latentScale'] = latentScale
+        self.metadata.latentScale = int(latentScale)
 
 
     def loadModel(self):
@@ -108,7 +113,7 @@ class SequenceVAETrainer(ModelTrainer):
         if self.model is None:
             raise Exception('Model not set')
         self.model.save(quantize=quantize, metadata = self.metadata)
-        self.saveModelInfo()
+        self.saveModelInfo(metadata = self.metadata)
 
 
     def calcRecall(self):

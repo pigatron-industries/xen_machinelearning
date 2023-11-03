@@ -137,8 +137,7 @@ class SongDataSet:
     def fromMidiPaths(cls, paths:List[str], recursive = False):
         dataset = cls([])
         for path in paths:
-            # if path is file
-            if path.endswith('.mid'):
+            if path.lower().endswith('.mid'):
                 dataset.loadMidiFiles([path])
             else:
                 dataset.loadMidiDir(path, recursive)
@@ -151,9 +150,9 @@ class SongDataSet:
 
     def loadMidiDir(self, path, recursive = False):
         if recursive:
-            files = glob.glob(path + "/**/*.mid", recursive=True)
+            files = glob.glob(path + "/**/*.[mM][iI][dD]", recursive=True)
         else:
-            files = glob.glob(path + "/*.mid", recursive=False)
+            files = glob.glob(path + "/*.[mM][iI][dD]", recursive=False)
         print(f'Loading {len(files)} files')
         self.loadMidiFiles(files)
 
@@ -163,10 +162,13 @@ class SongDataSet:
         label = Label()
         display(progress, label)
         for i, file in enumerate(files):
-            song = SongData.fromMidiFile(file)
-            self.songs.append(song)
-            progress.value = i + 1
-            label.value = f'{i + 1}/{len(files)}'
+            try:
+                song = SongData.fromMidiFile(file)
+                self.songs.append(song)
+                progress.value = i + 1
+                label.value = f'{i + 1}/{len(files)}'
+            except Exception as e:
+                print(f'Error loading {file}: {e}')
 
         print(f'Loaded {len(self.songs)} songs')
 

@@ -2,6 +2,7 @@ from .Codec import Codec
 from music21.stream.base import Score, Part, Measure
 from xen.data.SongData import SongData, SongDataSet, elementToMidiPitches
 from xen.utils import isInteger
+from xen.data.Filter import NameFilter
 from typing import Callable, List
 import numpy as np
 
@@ -18,7 +19,7 @@ class NoteSequenceSparseCodec(Codec):
     measuresPerSequence: number of measures to include in each sequence, if None then the whole score is used
     """
     def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int|None=4, measuresPerSequence:int|None=1, timesignature:str|None='4/4', minMeasuresPerSequence:int=0,
-                 instrumentFilter:List[str]|None = None, trim:bool=True, normaliseOctave:bool=True, percussionMap:Callable[[int], int]|None=None):
+                 instrumentFilter:NameFilter|None = None, trim:bool=True, normaliseOctave:bool=True, percussionMap:Callable[[int], int]|None=None):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
         self.minMeasuresPerSequence = minMeasuresPerSequence
@@ -92,20 +93,26 @@ class NoteSequenceSparseCodec(Codec):
         return array of sparse sequences
         """
         sequences = self.makeSequencesFromSong(song)
+        for sequence in sequences:
+            if(sequence.shape[0] != self.sequenceShape[0]):
+                print(f'ERROR: Sparse sequence shape {sequence.shape} does not match expected shape {self.sequenceShape}')
+                raise Exception(f'ERROR: Sparse sequence shape {sequence.shape} does not match expected shape {self.sequenceShape}')
         song.sequences = sequences
         return sequences
 
 
     def makeSequencesFromSong(self, song: SongData) -> List[np.ndarray]:
-        print(f'Encoding {song.filePath}')
         sequences:List[np.ndarray] = []
         ignoredSequences = 0
         if(self.instrumentFilter is not None):
             parts = song.getPartsByInstruments(self.instrumentFilter)
         else:
             parts = song.getParts()
-        # if(len(parts) > 1):
-        #     print(f'Warning: {song.filePath} has {len(parts)} parts')
+        print(f'Encoding {len(parts)} parts from {song.filePath}')
+        for part in parts:
+            print(f'{part.partName}')
+            for instrument in part.getInstruments():
+                print(f'\t{instrument.instrumentName}')
         for part in parts:
             measuresList = song.getConsecutiveMeasures(part, self.measuresPerSequence, self.timesignature)
             for measures in measuresList:
@@ -117,8 +124,11 @@ class NoteSequenceSparseCodec(Codec):
                     for measure in measures:
                         measureSeq = self.makeSequenceFromMeasure(measure)
                         sequence = np.append(sequence, measureSeq, 0)
+                    if(len(sequence) != self.sequenceShape[0]):
+                        raise ValueError(f'ERROR: Sequence length {len(sequence)} does not match expected length {self.sequenceShape[0]}') 
                     sequences.append(sequence)
                 except ValueError as e:
+                    print(f'{e}')
                     ignoredSequences += 1
             if(ignoredSequences > 0):
                 print(f'Ignored {ignoredSequences} sequences from {song.filePath}')

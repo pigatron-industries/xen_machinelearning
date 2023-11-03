@@ -7,6 +7,7 @@ from music21.meter.base import TimeSignature
 from enum import Enum
 from xen.utils import isInteger
 from typing import List
+from .Filter import NameFilter
 import glob
 import re
 import numpy as np
@@ -42,15 +43,28 @@ class SongData:
         return self.score.getElementsByClass(Part)
     
 
-    def getPartsByInstruments(self, matchInstrumentNames:List[str]) -> List[Part]:
+    def getPartsByInstruments(self, instrumentFilter:NameFilter) -> List[Part]:
         parts = []
         for part in self.getParts():
             instruments = part.getInstruments()
+            partNames = [ part.partName ]
+            addPart = instrumentFilter.include is None
             for instrument in instruments:
-                for matchInstrumentName in matchInstrumentNames:
-                    if(re.search(matchInstrumentName, instrument.instrumentName) or
-                       re.search(matchInstrumentName, part.partName)):
-                        parts.append(part)
+                partNames.append(instrument.instrumentName)
+            if(instrumentFilter.include is not None):
+                for includeName in instrumentFilter.include:
+                    for partName in partNames:
+                        if(re.match(includeName, partName) is not None):
+                            addPart = True
+                            break
+            if(instrumentFilter.exclude is not None):
+                for excludeName in instrumentFilter.exclude:
+                    for partName in partNames:
+                        if(re.match(excludeName, partName) is not None):
+                            addPart = False
+                            break
+            if(addPart):
+                parts.append(part)
         return parts
     
 

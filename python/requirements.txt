@@ -1,0 +1,5 @@
+ipywidgets
+music21
+tensorflow
+tflite-support
+pyyaml

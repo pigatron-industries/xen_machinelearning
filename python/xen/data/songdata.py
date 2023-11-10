@@ -92,32 +92,44 @@ class SongData:
         return False
 
     def getConsecutiveMeasures(self, part, measuresPerSequence, match_timesig):
+        """ 
+        Split a part into a list of consecutive measures of size measuresPerSequence.
+        If a part has a gap (measure with no notes) then it is discarded and the measures are split.
+        """
         consecutiveMeasuresList = []
         consecutiveMeasures = []
-        measures = part.getElementsByClass(Measure)
+        allMeasures = part.getElementsByClass(Measure)
         currentTimeSig = None
         i = 0
-        while i < len(measures):
-            measure = measures[i]
+        while i < len(allMeasures):
+            measure = allMeasures[i]
             notes = measure.recurse().notes
             if(measure.timeSignature != None):
                 currentTimeSig = measure.timeSignature
-            
-            if(len(notes) > 0):
-                if(measuresPerSequence is not None and currentTimeSig.ratioString == match_timesig):
-                    consecutiveMeasures.append(measure)
-                    if(len(consecutiveMeasures) == measuresPerSequence):
-                        consecutiveMeasuresList.append(consecutiveMeasures)
+
+            # max sequence length defined
+            if(measuresPerSequence is not None):
+                if(len(notes) > 0):
+                    if(currentTimeSig.ratioString == match_timesig):
+                        # accept measure
+                        consecutiveMeasures.append(measure)
+                        if(len(consecutiveMeasures) == measuresPerSequence):
+                            consecutiveMeasuresList.append(consecutiveMeasures)
+                            consecutiveMeasures = []
+                    else:
+                        # discard measure
                         consecutiveMeasures = []
-                elif(measuresPerSequence is None):
+            
+            # no max sequence length defined
+            if(measuresPerSequence is None):
+                if(len(notes) > 0):
+                    # accept measure
                     consecutiveMeasures.append(measure)
                 else:
-                    consecutiveMeasures = []
-
-            if(len(notes) == 0):
-                if(measuresPerSequence is None and len(consecutiveMeasures) > 0):
-                    consecutiveMeasuresList.append(consecutiveMeasures)
-                    consecutiveMeasures = []
+                    # discard measure and split
+                    if(len(consecutiveMeasures) > 0):
+                        consecutiveMeasuresList.append(consecutiveMeasures)
+                        consecutiveMeasures = []
 
             i += 1
             

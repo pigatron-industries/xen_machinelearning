@@ -1,4 +1,5 @@
 from xen.data.SongData import SongData, SongDataSet
+from xen.data.Filter import SongDataFilter
 from xen.data.PercussionMap import PercussionMap
 from xen.codecs.NoteSequenceFlatCodec import NoteSequenceFlatCodec
 from xen.models.VariationalAutoencoder import VariationalAutoEncoder
@@ -49,10 +50,10 @@ class SequenceVAETrainer(ModelTrainer):
         self.model = model
 
 
-    def loadSongDataset(self, paths:List[str], recursive:bool = False, timesig = '4/4', ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
-                        instrumentFilter:List[str]|None = None, percussionMap:PercussionMap|None = None):
-        self.dataset = SongDataSet.fromMidiPaths(paths, recursive).filterTimeSig(timesig)
-        self.codec = NoteSequenceFlatCodec(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature=timesig, instrumentFilter=instrumentFilter, trim = True, normaliseOctave=True, percussionMap=percussionMap)
+    def loadSongDataset(self, paths:List[str], filter:SongDataFilter, recursive:bool = False, ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
+                        percussionMap:PercussionMap|None = None):
+        self.dataset = SongDataSet.fromMidiPaths(paths, recursive).filterTimeSig(filter.timeSignature)
+        self.codec = NoteSequenceFlatCodec(filter, ticksPerQuarter, quartersPerMeasure, measuresPerSequence, trim = True, normaliseOctave=True, percussionMap=percussionMap)
         self.codec.encodeAll(self.dataset)
         if(percussionMap is None):
             self.metadata = SequenceVAENoteMetaData(notesPerTick=self.codec.maxNote-self.codec.minNote+1, 
@@ -65,11 +66,11 @@ class SequenceVAETrainer(ModelTrainer):
                                                                  latentScale=3)
         self.datasetInfo['paths'] = paths
         self.datasetInfo['recursive'] = recursive
-        self.datasetInfo['timesig'] = timesig
+        self.datasetInfo['timesig'] = filter.timeSignature
         self.datasetInfo['ticksPerQuarter'] = ticksPerQuarter
         self.datasetInfo['quartersPerMeasure'] = quartersPerMeasure
         self.datasetInfo['measuresPerSequence'] = measuresPerSequence
-        self.datasetInfo['instrumentFilter'] = instrumentFilter
+        self.datasetInfo['instrumentFilter'] = filter.instrumentName
 
 
     def createModel(self, latentDim = 3, hiddenLayers = 2, latentScale:float = 3.0):

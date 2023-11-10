@@ -1,6 +1,7 @@
 from .NoteSequenceSparseCodec import NoteSequenceSparseCodec
 from xen.data.SongData import SongData, SongDataSet
-from xen.data.Filter import NameFilter
+from xen.data.Filter import SongDataFilter
+from xen.data.PercussionMap import PercussionMap
 from typing import Callable, List
 import numpy as np
 
@@ -13,9 +14,9 @@ class NoteSequenceFlatCodec(NoteSequenceSparseCodec):
     Takes a SparseNoteSequence and flattens it into 1 dimension.
     Compresses the resulting array by removing all data points that are never used.
     """
-    def __init__(self, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, timesignature:str='4/4', 
-                 instrumentFilter:NameFilter|None = None, trim:bool=True, normaliseOctave:bool=True, percussionMap:None|Callable[[int], int]=None):
-        super().__init__(ticksPerQuarter, quartersPerMeasure, measuresPerSequence, timesignature, instrumentFilter = instrumentFilter, normaliseOctave=normaliseOctave, percussionMap=percussionMap)
+    def __init__(self, filter:SongDataFilter, ticksPerQuarter:int=4, quartersPerMeasure:int=4, measuresPerSequence:int=1, 
+                 trim:bool=True, normaliseOctave:bool=True, percussionMap:PercussionMap|None=None):
+        super().__init__(filter, ticksPerQuarter, quartersPerMeasure, measuresPerSequence, normaliseOctave=normaliseOctave, percussionMap=percussionMap)
         self.encodedShape = (ticksPerQuarter*measuresPerSequence*quartersPerMeasure*NUM_NOTES,)
         self.trim = trim
         self.maxNote = NUM_NOTES-1

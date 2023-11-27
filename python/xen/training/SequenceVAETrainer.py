@@ -51,9 +51,10 @@ class SequenceVAETrainer(ModelTrainer):
 
 
     def loadSongDataset(self, paths:List[str], filter:SongDataFilter, recursive:bool = False, ticksPerQuarter = 4, quartersPerMeasure = 4, measuresPerSequence = 1, 
-                        percussionMap:PercussionMap|None = None):
+                        percussionMap:PercussionMap|None = None, mergeParts:bool = False):
         self.dataset = SongDataSet.fromMidiPaths(paths, recursive).filterTimeSig(filter.timeSignature)
-        self.codec = NoteSequenceFlatCodec(filter, ticksPerQuarter, quartersPerMeasure, measuresPerSequence, trim = True, normaliseOctave=True, percussionMap=percussionMap)
+        self.codec = NoteSequenceFlatCodec(filter, ticksPerQuarter, quartersPerMeasure, measuresPerSequence, trim = True, normaliseOctave=True, 
+                                           percussionMap = percussionMap, mergeParts = mergeParts)
         self.codec.encodeAll(self.dataset)
         if(percussionMap is None):
             self.metadata = SequenceVAENoteMetaData(notesPerTick=self.codec.maxNote-self.codec.minNote+1, 
@@ -71,6 +72,7 @@ class SequenceVAETrainer(ModelTrainer):
         self.datasetInfo['quartersPerMeasure'] = quartersPerMeasure
         self.datasetInfo['measuresPerSequence'] = measuresPerSequence
         self.datasetInfo['instrumentFilter'] = filter.instrumentName
+        self.datasetInfo['mergeParts'] = mergeParts
 
 
     def createModel(self, latentDim = 3, hiddenLayers = 2, latentScale:float = 3.0):
@@ -122,22 +124,19 @@ class SequenceVAETrainer(ModelTrainer):
             raise Exception('Model not set')
         output = self.model.predict(self.getTrainData())
         matches = self._countMatches(self.dataset.getDataset(), output)
-        print(f'{matches/len(self.dataset.getDataset())*100}% recall')
+        recall = matches / (self.dataset.getDataset()[0].size * len(self.dataset.getDataset()))
+        print(f'{recall*100}% recall')
 
 
     def _countMatches(self, indata, outdata):
-        matches = 0
+        elementMatches = 0
         for i in range(0, len(indata)):
             insequence = indata[i]
             outsequence = outdata[i]
-            match = True
             for j in range(len(insequence)):
-                if ((insequence[j] >= 0.5 and outsequence[j] < 0.5) or (insequence[j] < 0.5 and outsequence[j] >= 0.5)):
-                    match = False
-                    # print(i)
-            if (match):
-                matches = matches + 1
-        return matches
+                if ((insequence[j] >= 0.5 and outsequence[j] >= 0.5) or (insequence[j] < 0.5 and outsequence[j] < 0.5)):
+                    elementMatches += 1
+        return elementMatches
     
 
     def plotLatentSpace(self, dimensions = 3):

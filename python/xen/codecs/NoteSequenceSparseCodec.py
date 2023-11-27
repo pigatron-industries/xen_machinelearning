@@ -21,13 +21,14 @@ class NoteSequenceSparseCodec(Codec):
     measuresPerSequence: number of measures to include in each sequence, if None then the whole score is used
     """
     def __init__(self, filter:SongDataFilter, ticksPerQuarter:int=4, quartersPerMeasure:int|None=4, measuresPerSequence:int|None=1, minMeasuresPerSequence:int=0,
-                 trim:bool=True, normaliseOctave:bool=True, percussionMap:PercussionMap|None=None):
+                 trim:bool=True, normaliseOctave:bool=True, mergeParts:bool=False, percussionMap:PercussionMap|None=None):
         self.ticksPerQuarter = ticksPerQuarter
         self.measuresPerSequence = measuresPerSequence
         self.minMeasuresPerSequence = minMeasuresPerSequence
         self.quartersPerMeasure = quartersPerMeasure
         self.filter = filter
         self.trim = trim
+        self.mergeParts = mergeParts
         if(measuresPerSequence is not None and quartersPerMeasure is not None):
             self.sequenceShape = (ticksPerQuarter*quartersPerMeasure*measuresPerSequence, NUM_NOTES)
         else:
@@ -71,8 +72,9 @@ class NoteSequenceSparseCodec(Codec):
 
     def encodeAll(self, dataset: SongDataSet) -> List[np.ndarray]:
         sequences:List[np.ndarray] = []
-        for song in dataset.songs:
+        for i, song in enumerate(dataset.songs):
             try:
+                print(f'Encoding {i}/{len(dataset.songs)}')
                 songSequences = self.encodeSparse(song)
                 sequences.extend(songSequences)
             except Exception as e:
@@ -109,33 +111,42 @@ class NoteSequenceSparseCodec(Codec):
             parts = song.getPartsByInstruments(self.filter.instrumentName)
         else:
             parts = song.getParts()
+        if(len(parts) == 0):
+            raise Exception(f'ERROR: No parts found matching filter in {song.filePath}')
         print(f'Encoding {len(parts)} parts from {song.filePath}')
-        for part in parts:
-            print(f'{part.partName}')
-            for instrument in part.getInstruments():
-                print(f'\t{instrument.instrumentName}')
-        for part in parts:
-            consecutiveMeasures = song.getConsecutiveMeasures(part, self.measuresPerSequence, self.filter.timeSignature)
-            for measures in consecutiveMeasures:
-                try:
-                    sequence = self.makeSequenceFromMeasures(measures)
-                    sequences.append(sequence)
-                except ValueError as e:
-                    print(f'{measures[0].number}: {e}')
-                    ignoredSequences += 1
-            if(ignoredSequences > 0):
-                print(f'Ignored {ignoredSequences} sequences from {song.filePath}')
+        # for part in parts:
+        #     print(f'{part.partName}')
+        #     for instrument in part.getInstruments():
+        #         print(f'\t{instrument.instrumentName}')
+
+        if(self.mergeParts):
+            consecutiveMeasures = song.getConsecutiveMeasures(parts, self.measuresPerSequence, self.filter.timeSignature)
+        else:
+            consecutiveMeasures = []
+            for part in parts:
+                measures = song.getConsecutiveMeasures([part], self.measuresPerSequence, self.filter.timeSignature)
+                consecutiveMeasures.extend(measures)
+
+        for measures in consecutiveMeasures:
+            try:
+                sequence = self.makeSequenceFromConsecutiveMeasures(measures)
+                sequences.append(sequence)
+            except ValueError as e:
+                print(f'{measures[0][0].number}: {e}')
+                ignoredSequences += 1
+        if(ignoredSequences > 0):
+            print(f'Ignored {ignoredSequences} sequences from {song.filePath}')
         print(f'Encoded {len(sequences)} sequences from {song.filePath}')
         return sequences
     
 
-    def makeSequenceFromMeasures(self, measures:List[Measure]):
+    def makeSequenceFromConsecutiveMeasures(self, measures:List[List[Measure]]):
         if(len(measures) < self.minMeasuresPerSequence):
             raise ValueError(f'ERROR: Sequence length {len(measures)} is less than minimum {self.minMeasuresPerSequence}')
         numNotes = 0
         sequence = np.empty((0, NUM_NOTES))
-        for measure in measures:
-            measureSeq, measureNotes = self.makeSequenceFromMeasure(measure)
+        for parallelMeasures in measures:
+            measureSeq, measureNotes = self.makeSequenceFromParallelMeasures(parallelMeasures)
             sequence = np.append(sequence, measureSeq, 0)
             numNotes += measureNotes
         if(numNotes < self.filter.minNotesPerSequence):
@@ -145,8 +156,8 @@ class NoteSequenceSparseCodec(Codec):
         return sequence
 
 
-    def makeSequenceFromMeasure(self, measure: Measure):
-        sequence = np.zeros((int(measure.duration.quarterLength * self.ticksPerQuarter), NUM_NOTES))
+    def makeSequenceFromParallelMeasures(self, measures:List[Measure]):
+        sequence = np.zeros((int(measures[0].duration.quarterLength * self.ticksPerQuarter), NUM_NOTES))
         if(self.normaliseOctave):
             lowestNote = self.getLowestNote(measure)
             lowestOctave = int(lowestNote/12)
@@ -155,14 +166,19 @@ class NoteSequenceSparseCodec(Codec):
             transpose = 0
 
         numNotes = 0
-        elements = measure.recurse().notes
+        elements = []
+        for measure in measures:
+            elements.extend(measure.recurse().notes)
         if(len(elements) == 0):
-            print(f'Warning: measure {measure.number} has no notes')
+            print(f'Warning: measure {measures[0].number} has no notes')
         for element in elements:
             offset = element.offset * self.ticksPerQuarter
             for midinote in elementToMidiPitches(element):
-                self.addNoteToSequence(sequence, midinote, offset, transpose)
-            numNotes += 1
+                try:
+                    self.addNoteToSequence(sequence, midinote, offset, transpose)
+                    numNotes += 1
+                except ValueError as e:
+                    print(f'WARMNING: Note not added: {measures[0].number}: {e}')
         return sequence, numNotes
     
 
@@ -176,8 +192,10 @@ class NoteSequenceSparseCodec(Codec):
                 # tuple means instrument has an accent value
                 sequence[int(offset)][group[0]] = 1
                 sequence[int(offset)][group[0]+1] = group[1]
-            else:
+            elif(group is not None):
                 sequence[int(offset)][group] = 1
+            else:
+                raise ValueError(f'ERROR: note {midinote} not in percussion map')
         else:
             midinote = midinote - transpose
             sequence[int(offset)][midinote] = 1

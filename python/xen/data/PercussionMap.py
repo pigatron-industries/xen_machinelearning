@@ -32,6 +32,13 @@ CRASH_CYMBAL_2      = 57
 VIBRA_SLAP          = 58
 RIDE_CYMBAL_2       = 59
 
+HIGH_BONGO          = 60
+LOW_BONGO           = 61
+
+TRIANGLE_MUTE       = 80
+TRIANGLE_OPEN       = 81
+
+
 
 percussionMidiToName  =  {
     ACCOUSTIC_BASS_DRUM: 'ACCOUSTIC_BASS_DRUM',
@@ -102,12 +109,12 @@ ExtendedPercussionMap = PercussionMap({
         # snare
         1: [SIDE_STICK, ACCOUSTIC_SNARE, HAND_CLAP, ELECTRIC_SNARE], 
         # toms
-        2: [LOW_FLOOR_TOM],
-        3: [HIGH_FLOOR_TOM],
+        2: [LOW_FLOOR_TOM, LOW_BONGO],
+        3: [HIGH_FLOOR_TOM, HIGH_BONGO],
         4: [LOW_TOM],
         5: [LOW_MID_TOM],
-        6: [HI_MID_TOM],
-        7: [HIGH_TOM],
+        6: [HI_MID_TOM, TRIANGLE_MUTE],
+        7: [HIGH_TOM, TRIANGLE_OPEN],
         # hi-hat
         8: [CLOSED_HI_HAT, PEDAL_HI_HAT],
         9: [OPEN_HI_HAT],

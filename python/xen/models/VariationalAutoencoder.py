@@ -8,6 +8,7 @@ from tensorflow.keras import metrics
 from tensorflow.keras.utils import custom_object_scope
 import tensorflow as tf
 import os
+import numpy as np
 
 
 def sampling(args):
@@ -37,19 +38,19 @@ class VariationalAutoEncoder(AbstractModel):
 
 
     @classmethod
-    def from_new(cls, layerDims, path, name, latentScale = 3.0):
+    def from_new(cls, inputShape, layerDims, path, name, latentScale = 3.0):
         model = cls(path = path, name = name)
-        model.create(layerDims=layerDims, latentScale=latentScale)
+        model.create(inputShape = inputShape, layerDims=layerDims, latentScale=latentScale)
         return model
 
 
-    def create(self, layerDims = [2048, 512, 128, 32], latentScale = 3.0):
-        self.inputDim = layerDims[0]
-        self.internalDims = layerDims[1:-1]
+    def create(self, inputShape = 2048, layerDims = [512, 128, 32], latentScale = 3.0):
+        self.inputShape = inputShape
+        self.internalDims = layerDims[0:-1]
         self.latentDim = layerDims[-1]
         self.latentScale = latentScale
         # encoder model
-        self.encoderInputLayer = Input(self.inputDim, name='encoder_input')
+        self.encoderInputLayer = Input(self.inputShape, name='encoder_input')
         encoderInternalLayer = self.encoderInputLayer
         internalInputLayer = self.encoderInputLayer
         for i, dim in enumerate(self.internalDims):
@@ -67,7 +68,7 @@ class VariationalAutoEncoder(AbstractModel):
         for i, dim in enumerate(self.internalDims[::-1]):
             decoderInternalLayer = Dense(dim, activation='relu', name=f'decoder_internal_{i}')(internalInputLayer)
             internalInputLayer = decoderInternalLayer
-        self.decoderOutputLayer = Dense(self.inputDim, activation = 'sigmoid', name='decoder_output')(decoderInternalLayer)
+        self.decoderOutputLayer = Dense(self.inputShape, activation = 'sigmoid', name='decoder_output')(decoderInternalLayer)
         self.decoderModel = Model(self.decoderInputLayer, self.decoderOutputLayer, name='decoder')
         self.decoderModel.summary()
         # autoencoder model
@@ -83,7 +84,7 @@ class VariationalAutoEncoder(AbstractModel):
     
     def vaeLoss(self, inputLayer, outputLayer):
         # reconstructionLoss = metrics.mean_squared_error(inputLayer, outputLayer) * self.inputDim
-        reconstructionLoss = metrics.binary_crossentropy(inputLayer, outputLayer) * self.inputDim
+        reconstructionLoss = metrics.binary_crossentropy(inputLayer, outputLayer) * np.prod(self.inputShape)
         klLoss = -0.5 * K.sum(1 + self.logVarLayer - K.square(self.meanLayer) - K.exp(self.logVarLayer), axis=-1)
         return K.mean(reconstructionLoss + klLoss)
 
@@ -131,7 +132,7 @@ class VariationalAutoEncoder(AbstractModel):
         self.vaeOutputLayer = self.decoderModel.output
         self.vaeModel.summary()
 
-        self.inputDim = self.encoderInputLayer.shape[1]
+        self.inputShape = self.encoderInputLayer.shape
         self.latentDim = self.meanLayer.shape[1]
         self.internalDims = []
         for i in range(len(self.vaeModel.layers)):

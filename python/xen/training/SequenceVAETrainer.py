@@ -77,15 +77,16 @@ class SequenceVAETrainer(ModelTrainer):
 
     def createModel(self, latentDim = 3, hiddenLayers = 2, latentScale:float = 3.0):
         # calculate layer dimensions as a reduction by equal factor
-        inputDim = self.dataset.getDataset()[0].shape[0]
+        inputShape = self.dataset.getDataset()[0].shape
+        inputSize = np.prod(inputShape)
         # inputDim = self.dataset.getDataset().shape[1]
-        dimDivider = (inputDim // latentDim) ** (1./(hiddenLayers + 1))
-        layerDims = [inputDim]
+        dimDivider = (inputSize // latentDim) ** (1./(hiddenLayers + 1))
+        layerDims = []
         for i in range(hiddenLayers):
             layerDims.append(int(layerDims[-1] / dimDivider))
         layerDims.append(latentDim)
         print(f'Layer dims: {layerDims}')
-        self.model = VariationalAutoEncoder.from_new(layerDims=layerDims, name=self.modelName, path=self.modelPath, latentScale=latentScale)
+        self.model = VariationalAutoEncoder.from_new(inputShape=inputShape, layerDims=layerDims, name=self.modelName, path=self.modelPath, latentScale=latentScale)
         self.model.compile(optimizer=Adam(learning_rate=0.005))
         self.modelInfo['latentDim'] = latentDim
         self.modelInfo['hiddenLayers'] = hiddenLayers

@@ -37,14 +37,13 @@ class LongShortTermMemory(AbstractModel):
     def create(self, inputShape, lstmDim = 128):
         self.inputShape = inputShape
         self.inputLayer = tf.keras.Input(inputShape)
-        self.lstmLayer = tf.keras.layers.LSTM(128)(self.inputLayer)
+        self.lstmLayer = tf.keras.layers.LSTM(lstmDim)(self.inputLayer)
         self.outputLayer = tf.keras.layers.Dense(lstmDim)(self.lstmLayer)
-        pass
+        self.lstmModel = Model(self.inputLayer, self.outputLayer, name='lstm')
 
     
-
-    # def compile(self, optimizer=Adam(learning_rate=0.01)):
-    #     self.vaeModel.compile(optimizer=optimizer, loss=self.vaeLoss)
+    def compile(self, optimizer=Adam(learning_rate=0.01)):
+        self.lstmModel.compile(optimizer=optimizer, loss='binary_crossentropy')
 
 
     def train(self, traindata, epochs, batchSize = 32):

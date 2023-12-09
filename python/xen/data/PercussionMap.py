@@ -66,7 +66,18 @@ percussionMidiToName  =  {
     CRASH_CYMBAL_2: 'CRASH_CYMBAL_2',
     VIBRA_SLAP: 'VIBRA_SLAP',
     RIDE_CYMBAL_2: 'RIDE_CYMBAL_2',
+    HIGH_BONGO: 'HIGH_BONGO',
+    LOW_BONGO: 'LOW_BONGO',
+    TRIANGLE_MUTE: 'TRIANGLE_MUTE',
+    TRIANGLE_OPEN: 'TRIANGLE_OPEN'
 }
+
+def getPercussionName(midi:int) -> str:
+    """Get the name of the percussion instrument for the given midi note number."""
+    if(midi in percussionMidiToName):
+        return percussionMidiToName[midi]
+    else:
+        return str(midi)
 
 
 class PercussionMap:
